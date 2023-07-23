@@ -1,1 +1,1 @@
-File previews via tabbed xembed with persistent application states. Uses neovim with it's server backend for text files. Mpv via it's ipc socket for media files. Zathura via it's dbus interface for portable documents.
+File previews via tabbed xembed with persistent application states. For text mimes, neovim with it's server interface. For media files, mpv via it's ipc socket. For portable docs, Zathura via dbus.
