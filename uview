@@ -152,11 +152,13 @@ elif which urxvt >/dev/null 2>&1 ; then
 elif which xterm >/dev/null 2>&1 ; then
   term="xterm -into"
 else
-  echo "No xembed term found" >&2
-fi # nuke: # $1 -> $XID, $2 -> $f_curr
+  prnt "no xembed term found" >&2
+fi
 
 pager=${PAGER:-"nvim -R"}
+
 nuke="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/nuke"
+
 _term_nuke ()  { $term "$1" -e "$nuke" "$2" & }
 
 
@@ -285,7 +287,7 @@ _p_tabbed_start () { # start tabbed
     mkfifo "$fifoy"
     tabbed -n preview > "$fifoy" &
       
-    jobs # clear 'completed'
+    jobs
     pid_tabd="$(jobs -p %%)"
     soc="${MPV_SOCKET:-/tmp/mpvsoc.$pid_tabd}"
     
@@ -300,7 +302,7 @@ _p_tabbed_start () { # start tabbed
     i3-msg 'for_window [id="$xid"] border 2px'
     i3-msg 'for_window [instance="preview"] border 2px' ;}
 
-_sigint_kill () { _kill_viewer; kill "$pid_tabd"; exit 0 ; }
+_kill_all() { _kill_viewer; kill "$pid_tabd"; exit 0 ; }
 
 
 # viewing #######################################
@@ -380,7 +382,7 @@ _main_init() {
   # init sigs
   unset -v fifox
   exec >/dev/null 2>&1  # mute from now
-  trap sigint_kill SIGINT
+  trap _kill_all SIGINT
 
   # init tabbed
   _get_main_win
