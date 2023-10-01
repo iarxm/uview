@@ -21,19 +21,18 @@ t1="100000"
 # init universals
 
 fifox="$1"
+echo $fifox >> ~/log
 
-{ [ ! -n "$fifox" ] && [ -f "$NNN_FIFO" ]; } || fifox="$NNN_FIFO"
+{ [ -z "$fifox" ] && [ -f "$NNN_FIFO" ]; } || fifox="$NNN_FIFO"
 
 mkdir -p "$pcache"
 log_x="$pcache/uview.log"
 cache_tt_switch="$pcache/cache.tt.switch"
 cache_f_curr="$pcache/cache.f_curr"
 
-nvim_serv="$fifox.nvim.server.pipe"
-
 tab_mpv="1" # mpv tab
-tab_nvi="2" # nvim tab
-tab_zat="3" # zathura tab
+tab_zat="2" # zathura tab
+tab_nvi="3" # nvim tab
 
 # init univ futures
 
@@ -76,7 +75,7 @@ _set_pid_mpv()      { pid_mpv="$(_prnt_pid_mpv)"; }
 
 _set_pid_nvim()     { pid_nvim="$(_prnt_pid_mpv)[1]"; }
 
-_prnt "y" > "$cache_tt_switch"
+_prnt "y" > "$cache_tt_switch" # add this into a 'init' function
 
 
 # window/viewers/jobs ########################################
@@ -85,13 +84,14 @@ _get_viewer_pid ()  { pid_view="$(jobs -p %%)"; }
 
 _get_main_win()     { main_win="$(xdotool getactivewindow)" ; }
 
-_get_win_id()       { xdotool search --pid $1 | head -1; } # $1 is $pid
+_get_win_id()       { xdotool search --pid "$1" | head -1; } # $1 is $pid
 
-_set_winid_mpv()    { winid_mpv="$(_get_win_id $pid_mpv)"; }
+_set_winid_mpv()    { winid_mpv="$(_get_win_id "$pid_mpv")"; }
 
-_set_winid_nvim()   { winid_nvim="$(_get_win_id $pid_nvim)"; }
+_set_winid_nvim()   { winid_nvim="$(_get_win_id "$pid_nvim")"; }
 
-_set_winid_zath()   { winid_nvim="$(_get_win_id $pid_zath)"; } #TODO
+_set_winid_zath()   { winid_nvim="$(_get_win_id "$pid_zath")"; } #TODO
+# winid's are not required now?
 
 
 # foc
@@ -100,11 +100,9 @@ _win_foc_brute()    { _window_foc_brutex; } # unused?
 
 _win_foc_main()     { xdotool windowactivate "$main_win"; }
 
+_win_foc_mainx()     { sleep 0.8s; xdotool windowactivate "$main_win"; }
+
 _win_foc_xid()      { xdotool windowactivate "$xid"; }
-
-#_win_foc_tabx()     { _win_foc_xid; xdotool key "Ctrl+$1"; } # _win_foc_main; }
-
-#_win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1"; } # _win_foc_main; }
 
 _win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1";  _win_foc_main; }
 
@@ -114,6 +112,10 @@ _win_foc_nvim()     { _win_foc_tabx $tab_nvi; }
 
 _win_foc_zath()     { _win_foc_tabx $tab_zat; } #TODO
 
+#_win_foc_tabx()     { _win_foc_xid; xdotool key "Ctrl+$1"; } # _win_foc_main; }
+
+#_win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1"; } # _win_foc_main; }
+
 
 # behave
 
@@ -121,6 +123,7 @@ _win_foc() {
   xid_active="$(xdotool getactivewindow)"
   if [ $((xid_active == xid)) -ne 0 ] ; then
     xdotool windowactivate "$main_win"
+    #xdotool windowactivate --sync "${wid_x}" \
     #else
       #timeout "$t_lim_xdot" xdotool behave "$xid" focus windowactivate "$main_win" &
   fi; }
@@ -188,8 +191,9 @@ _mpvx() { # socket mpv
 
 # nvim #######################################
 
+
 _nvim_start() { 
-  $term "$xid" -e nvim --listen "${nvim_serv}" &
+  $term "$xid" -e nvim --listen "${nvim_serv}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black'&
   { sleep 0.2 && _set_pid_nvim; set_winid_nvim; } & }
 
 _nvim_send() { 
@@ -206,31 +210,37 @@ _nvimx() {
 
 
 # zath #########################################
+
 _prnt_zath_id() {
-  dbus-send --session \
+  dbus-send \
+    --session \
     --dest=org.freedesktop.DBus \
     --type=method_call          \
     --print-reply               \
     /org/freedesktop/DBus       \
     org.freedesktop.DBus.ListNames | sed -nr '/^.*string "(.*zathura.*)"/{s//\1/p;q;}' ;}
 
-_win_zath_id () { sleep 1; zath_id=$(_prnt_zath_id) ; }
+_win_zath_id () { sleep 1; zath_id="$(_prnt_zath_id)" ; }
 
 _zath_send() { # open file
-  dbus-send --session  \
-   --dest="$zath_id"  \
-   --type=method_call \
-   --print-reply      \
+  dbus-send \
+    --session  \
+    --dest="$zath_id"  \
+    --type=method_call \
+    --print-reply      \
     /org/pwmt/zathura  \
     org.pwmt.zathura.OpenDocument \
-    string:"$f_curr" \
+    string:"${f_curr}" \
     string:'' \
-    int32:1 >/dev/null ; }
+    int32:1 >> /dev/null ; }
+    #string:\'"${f_curr}"\' \
+    #TODO: issues with some filenames
 
-_zathxa() { zathura -e "$xid" "$f_curr" & _win_zath_id; }
+
+_zathxa() { zathura -e "$xid" "$f_curr"; _win_zath_id; }
 
 _zathx() {
-  [ -n "$zath_id" ] && { _zath_send; return; }
+  [ -n "$(_prnt_zath_id)" ] && { _zath_send; return; }
   _zathxa ;}
 
 
@@ -286,23 +296,40 @@ _p_tabbed_start () { # start tabbed
     fifoy="$(mktemp -u)"
     mkfifo "$fifoy"
     tabbed -n preview > "$fifoy" &
-      
+
     jobs
     pid_tabd="$(jobs -p %%)"
-    soc="${MPV_SOCKET:-/tmp/mpvsoc.$pid_tabd}"
-    
+    soc="${MPV_SOCKET:-/tmp/nnn.${pid_tabd}.mpv}"
+    nvim_serv="/tmp/nnn.${pid_tabd}.nvim"
+
     [ -z "$pid_tabd" ] && { echo "Can't start tabbed"; exit 1; }
     read -r xid < "$fifoy" && rm "$fifoy"
 
-    _mpv_xa & sleep 0.2
-    _nvim_start & sleep 0.5
-    _zathxa & sleep 0.2
+    #mime_last="inode/directory" # mime init
+    #
     
+    #while [ -z "$zath_id" ]; do sleep 0.1; done
+    _mpv_xa & sleep 0.5
+    _zathxa & sleep 0.5
+    _nvim_start & sleep 0.5
+    _win_zath_id
+
+    #_mpv_xa & sleep 1
+    #_zathxa & sleep 1
+    #_nvim_start & sleep 1
+    #_win_zath_id
+
+    #_mpv_xa & sleep 0.2
+    #_nvim_start & sleep 0.5
+    #_zathxa & sleep 0.2
+    
+    # required anymore?
     i3-msg 'no_focus [id="$xid"]' # i3 props
     i3-msg 'for_window [id="$xid"] border 2px'
     i3-msg 'for_window [instance="preview"] border 2px' ;}
 
-_kill_all() { _kill_viewer; kill "$pid_tabd"; exit 0 ; }
+_clean_fifos() { rm -f "$soc" "$nvim_serv"; }
+_kill_all() { _kill_viewer; kill "$pid_tabd"; _clean_fifos; exit 0 ; } # toto - add fifo cleanup in here too
 
 
 # viewing #######################################
@@ -374,9 +401,7 @@ _timer() {
   [ $f_start = $f_upd ] && _tt_sw "y" && return ;}
   
 
-# body ########################################################
-
-# init
+# body - init ########################################################
 
 _main_init() {
   # init sigs
@@ -387,10 +412,18 @@ _main_init() {
   # init tabbed
   _get_main_win
   _p_tabbed_start
-  _win_foc_main
+  _win_foc_mainx &
 
   # init handles
   _mime_handlers ;}
+
+_main_close() { # clean
+  _kill_viewer
+  _kill_tabbed
+  _kill_jobs; }
+
+
+# body - loop #####################################################
 
 _loop_init() { # init new file arg
   [ ! -e "$f_curr" ] && continue
@@ -399,48 +432,34 @@ _loop_init() { # init new file arg
  
   jobs && if ! jobs | grep tabbed ; then break; fi ; }
 
-
-# view
-
 _loop_view() {
   _kill_viewer
   _foc_viewer_x
   _mime_switch 
   _timer & }
 
-
-# close
-
 _loop_close() {
   _set_mime_last # set $mime_last
   _get_viewer_pid
   _win_foc ;}
 
-
-_main_close() { # clean
-  _kill_viewer
-  _kill_tabbed
-  _kill_jobs; }
+_loop() {
+  _loop_init
+  _loop_view
+  _loop_close ;}
 
 
 # main #######################################################
 
 _main () {
+  #f_currX=$f_curr_PREVIOUS
   _main_init
-  
-  while read -r f_curr ; do #f_currX=$f_curr_PREVIOUS
-  _loop_init
-  _loop_view
-  _loop_close
-  done
-
-  _main_close
-}
+  while read -r f_curr ; do _loop; done
+  _main_close ;}
 
 
 # RUN
 
 _test_fifo
 _main < "$fifox" &
-
 

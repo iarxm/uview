@@ -1,0 +1,5 @@
+#!/bin/env bash
+# set up testing environment
+px=$HOME/dsrc/uview
+pu=$px/uvie
+export PATH="$px:$pu:$PATH"
