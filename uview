@@ -314,7 +314,7 @@ _p_tabbed_start () { # start tabbed
 
     jobs
     pid_tabd="$(jobs -p %%)"
-    soc_mpv="/tmp/nnn.${pid_tabd}.mpv}"
+    soc_mpv="/tmp/nnn.${pid_tabd}.mpv"
     soc_nvim="/tmp/nnn.${pid_tabd}.nvim"
 
     [ -z "$pid_tabd" ] && { echo "Can't start tabbed"; exit 1; }
