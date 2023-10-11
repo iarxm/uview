@@ -35,7 +35,7 @@ log_x="$pcache/uview.log"
 log_y="$pcache/uviewy.log"
 cache_tt_switch="$pcache/cache.tt.switch"
 cache_f_curr="$pcache/cache.f_curr"
-mpv="mpx"
+[ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
 
 tab_mpv="1" # mpv tab
 tab_nvi="2" # nvim tab
@@ -182,7 +182,7 @@ _term_nuke ()  { $term "$xid" -e "$nuke" "$f_curr" & }
 
 # mpv #####################################
 
-_mpvxx() { mpv --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
+_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
 
 _mpv_set() {
   c=1
