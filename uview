@@ -37,9 +37,13 @@ cache_tt_switch="$pcache/cache.tt.switch"
 cache_f_curr="$pcache/cache.f_curr"
 [ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
 
-tab_mpv="1" # mpv tab
+#tab_mpv="1" # mpv tab
+#tab_nvi="2" # nvim tab
+#tab_zat="3" # zathura tab
+tab_mpv="3" # mpv tab
 tab_nvi="2" # nvim tab
-tab_zat="3" # zathura tab
+tab_zat="1" # zathura tab
+
 #mime_last="inode/directory" # mime init
 #mime_last=""
 mime_last="application/pdf" # first visible win is zath
@@ -322,8 +326,8 @@ _p_tabbed_start () { # start tabbed
 
     # note: currently, mpv starts quickest, then nvim, then zath. Thus, its a safe bet to initiate them in a partially reversed order with a slight delay after mpv
 
-    _mpvx & sleep 0.2
-    _nvimx & sleep 0.2
+    _mpvx & sleep 1.9
+    _nvimx & sleep 1
     _zathx #change to _zath?
     _set_soc_zath
 
