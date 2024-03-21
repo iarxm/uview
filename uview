@@ -40,9 +40,9 @@ cache_f_curr="$pcache/cache.f_curr"
 #tab_mpv="1" # mpv tab
 #tab_nvi="2" # nvim tab
 #tab_zat="3" # zathura tab
-tab_mpv="3" # mpv tab
+tab_mpv="1" # mpv tab
 tab_nvi="2" # nvim tab
-tab_zat="1" # zathura tab
+tab_zat="3" # zathura tab
 
 #mime_last="inode/directory" # mime init
 #mime_last=""
@@ -178,8 +178,8 @@ _term_nuke ()  { $term "$xid" -e "$nuke" "$f_curr" & }
 
 # mpv #####################################
 
-#_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
-_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle & }
+_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
+#_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle & }
 
 _mpv_set() {
   c=1
