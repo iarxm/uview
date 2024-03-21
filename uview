@@ -73,6 +73,7 @@ _prnt_pid_nvim()    { pgrep -f "nvim --listen ${soc_nvim}"; } #?
 _prnt_pid_mpv()     { pgrep -f "mpv .*$soc_mpv"; } #?
 
 _debugx()           { _prnt "$1" >> "$log_x" ; }
+_set_debug()        { _prnt "uview begin:" > "$log_x" ; }
 
 
 # set #########################################
@@ -148,15 +149,6 @@ _wait() { # creating a while loop instead of sleep x #tod
   done ;}
 
 
-# Cleanup #####################################################
-
-_kill_tabbed() { kill "$pid_tabd"; }
-
-_kill_fifos()  { rm -f "$soc_mpv" "$soc_nvim"; }
-
-_kill_all()    { _kill_tabbed; _kill_fifos; disown; exit 0 ; } # toto - add fifo cleanup in here too
-
-
 # mime/progs ###################################################
 
 # term
@@ -186,7 +178,8 @@ _term_nuke ()  { $term "$xid" -e "$nuke" "$f_curr" & }
 
 # mpv #####################################
 
-_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
+#_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
+_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle & }
 
 _mpv_set() {
   c=1
@@ -269,6 +262,17 @@ _zath_send() { # open file
     #string:\'"${f_curr}"\' \
     #TODO: issues with some filenames
 
+_zath_pid() {
+    _debugx "gdbus:"
+    gdbus introspect 
+      --session \
+      --dest "$soc_zath" \
+      --object-path / \
+      --only-properties -q >> $log_x
+    #grep -oP 'ProcessID=\K\d+'  # Extract ProcessID value using Perl-compatible regular expression
+}
+
+_zath_kill() { [ -n "$soc_zath" ] && kill -9 "$(echo "$soc_zath" | sed -n 's/.*PID-\([0-9]\+\).*/\1/p')"; }
 
 _zathx() { zathura -e "$xid" "$f_curr" & sleep 0.5s; _set_soc_id; }
 
@@ -397,7 +401,15 @@ _kill_viewer() { # viewer
   #_kill_nvim 
   #_kill_mpv
   _kill_viewer_pid ; }
- 
+
+# Cleanup #####################################################
+
+_kill_tabbed() { kill "$pid_tabd"; }
+
+_kill_fifos()  { rm -f "$soc_mpv" "$soc_nvim"; }
+
+_kill_all()    { _kill_tabbed; _kill_fifos; _zath_kill; disown; exit 0 ; }
+
 
 # body - init ########################################################
 
