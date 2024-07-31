@@ -3,75 +3,74 @@
 # ######################################################
 # AUTHOR: IAROM MADDEN
 #
-# file preview via tabbed xembed with persistent preview file state.
-# files are sent to previewer via interface/server setup
-#
-# dep: tabbed mpv neovim zathura nuke
+# file preview via tabbed xembed with persistent preview file state
+# files are sent to previewer via interface/server method
+# dep: tabbed mpv neovim zathura prg_nuke
 # tabbed configured w relative tabs and new pos = 1
+#
 # ########################################################
+
+# note: currently, mpv starts quickest, then nvim, then zath. Thus, its a safe bet to initiate them in a partially reversed order with a slight delay after mpv
 
 # todo: remove all unecessary code to persistent preview frames..
 #   - a major fraction of this file is unrequired now after simplifying certain problems.
-# todo: implement a 4th tab: with nuke for alternative files that dont fit into those 3 cats
+# todo: implement a 4th tab: with prg_nuke for alternative files that dont fit into those 3 cats
+# todo: focus fixer nnow not required due to mpv update?
 
-# init config
+###########################################################
 
-pcache="$HOME/.cache/uview"
+# init config [TODO:set in a config file]
+
+d_cache="$HOME/.cache/uview"
 t_lim="0.1"
-nuke="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/nuke"
-term="st -c preview -w"
-pager=${PAGER:-"nvim -R"}
-#t_lim_xdot="0.5"
-#t1="100000"
-
-# init universals
-fifox="$1"
-f1="$nnn"
-
-{ [ -z "$fifox" ] && [ -f "$NNN_FIFO" ]; } || fifox="$NNN_FIFO"
-
-mkdir -p "$pcache"
-log_x="$pcache/uview.log"
-log_y="$pcache/uviewy.log"
-cache_tt_switch="$pcache/cache.tt.switch"
-cache_f_curr="$pcache/cache.f_curr"
-[ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
-
-#tab_mpv="1" # mpv tab
-#tab_nvi="2" # nvim tab
-#tab_zat="3" # zathura tab
+prg_nuke="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/prg_nuke"
+prg_term="st -c preview -w"
+prg_pager=${prg_pager:-"nvim -R"}
 tab_mpv="1" # mpv tab
 tab_nvi="2" # nvim tab
 tab_zat="3" # zathura tab
+#t_lim_xdot="0.5"
+#t1="100000"
 
-#mime_last="inode/directory" # mime init
-#mime_last=""
-mime_last="application/pdf" # first visible win is zath
-mime_curr=""
-f_curr="$f1"
 
-xid=""
-pid_view=""
-pid_tabd=""
+# init universals
 
-soc_mpv=""
-soc_nvim=""
-soc_zath=""
-#f_last=""
+_init_var() {
+  fifox="$1"
+  fifoy=""
+  
+  f_first="$nnn"
+  f_curr="$file1"
+  #f_last=""
+  { [ -z "$fifox" ] && [ -f "$NNN_FIFO" ]; } || fifox="$NNN_FIFO"
+  
+  mkdir -p "$d_cache"
+  cache_t_swit="$d_cache/cache.t.swit"
+  cache_f_curr="$d_cache/cache.f_curr"
+  
+  [ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
+  mime_last="application/pdf" # first visible win is zath
+  mime_curr=""
+  
+  xid=""
+  pid_view=""
+  pid_tabd=""
+  soc_mpv=""
+  soc_nvim=""
+  soc_zath=""
+  
+  #log_x="$d_cache/uview.log"
+  #log_y="$d_cache/uviewy.log"
+}
 
 
 # print ########################################
 
 _prnt()             { printf "%s \n" "$@"; }
-
-_prnt_mime()        { file -bL --mime-type "${1}"; }
-
-_prnt_swit()        { cat "$cache_tt_switch"; }
+_prnt_swit()        { cat "$cache_t_swit"; }
 _prnt_f_cache()     { cat "$cache_f_curr"; }
-
 _prnt_pid_nvim()    { pgrep -f "nvim --listen ${soc_nvim}"; } #?
 _prnt_pid_mpv()     { pgrep -f "mpv .*$soc_mpv"; } #?
-
 _debugx()           { _prnt "$1" >> "$log_x" ; }
 _set_debug()        { _prnt "uview begin:" > "$log_x" ; }
 
@@ -79,13 +78,13 @@ _set_debug()        { _prnt "uview begin:" > "$log_x" ; }
 # set #########################################
 
 _set_cache_f_curr() { _prnt "$f_curr" > "$cache_f_curr"; }
-_set_mime_curr()    { mime_curr=$(_prnt_mime "${f_curr}"); }
+_set_mime_curr()    { mime_curr=$(file -bL --mime-type "${f_curr}"); }
 _set_mime_last()    { mime_last="${mime_curr}"; }
 
 _set_pid_mpv()      { pid_mpv="$(_prnt_pid_mpv)"; }
 _set_pid_nvim()     { pid_nvim="$(_prnt_pid_mpv)[1]"; } # why [1]?
 
-printf "y" > "$cache_tt_switch" # add this into a 'init' function
+printf "y" > "$cache_t_swit" # add this into a 'init' function
 
 
 # window/viewers/jobs ########################################
@@ -105,7 +104,7 @@ _set_winid_zath()   { winid_nvim="$(_get_win_id "$pid_zath")"; } #TODO
 # foc
 
 _win_foc_main()     { xdotool windowactivate "$fm_win"; }
-_win_foc_mainx()     { sleep 0.8s; xdotool windowactivate "$fm_win"; }
+_win_foc_mainx()    { sleep 0.8s; xdotool windowactivate "$fm_win"; }
 _win_foc_xid()      { xdotool windowactivate "$xid"; }
 _win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1";  _win_foc_main; }
 
@@ -154,31 +153,31 @@ _wait() { # creating a while loop instead of sleep x #tod
 # term
 
 _set_term() {
-  if which $term >/dev/null 2>&1 ; then
-    term=$term
+  if which $prg_term >/dev/null 2>&1 ; then
+    prg_term=$prg_term
   elif which st >/dev/null 2>&1 ; then
-    term="st -c preview -w"
+    prg_term="st -c preview -w"
   elif which urxvt >/dev/null 2>&1 ; then
-    term="urxvt -embed"
+    prg_term="urxvt -embed"
   elif which xterm >/dev/null 2>&1 ; then
-    term="xterm -into"
+    prg_term="xterm -into"
   else
     _prnt "no xembed term found" >&2
   fi ;}
 
-# todo: incase nuke is not installed, revert to 'less' or 'pager' as defined in config section
-#if [ -x "$nuke" ] ; then all() { _term_nuke; }
+# todo: incase prg_nuke is not installed, revert to 'less' or 'pager' as defined in config section
+#if [ -x "$prg_nuke" ] ; then all() { _term_prg_nuke; }
 #  else # shellcheck disable=SC2086
-#    all() { $term "$xid" -e sh -c "echo '$f_curr' | $pager -" & }
+#    all() { $prg_term "$xid" -e sh -c "echo '$f_curr' | $prg_pager -" & }
 #  fi 
-#txtp()  { $term "$xid" -e $pager "$f_curr" & }
+#txtp()  { $prg_term "$xid" -e $prg_pager "$f_curr" & }
 
-_term_nuke ()  { $term "$xid" -e "$nuke" "$f_curr" & }
+_term_prg_nuke ()  { $prg_term "$xid" -e "$prg_nuke" "$f_curr" & }
 
 
 # mpv #####################################
 
-_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle "${f_curr}" & }
+_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --focus-on=never --force-window=immediate --idle "${f_curr}" & }
 #_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle & }
 
 _mpv_set() {
@@ -206,7 +205,7 @@ _mpv() {
 
 # nvim #######################################
 
-_nvimxx() { $term "$xid" -e nvim --listen "${soc_nvim}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
+_nvimxx() { $prg_term "$xid" -e nvim --listen "${soc_nvim}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
 
 _nvim_set() {
   c=1
@@ -219,7 +218,7 @@ _nvim_set() {
 _nvimx() {
   _nvimxx ;}
   #_nvim_set ;}
-#[ -z "$pid_nvim" ] && $term "$xid" ;}
+#[ -z "$pid_nvim" ] && $prg_term "$xid" ;}
 
 _nvim_send() { 
   case $mime_curr in
@@ -286,16 +285,16 @@ _zath() {
 _mime_handlers() {
   if which mpv >/dev/null 2>&1 ; then
     media() { _mpv; } else
-    media() { _term_nuke; } fi
+    media() { _term_prg_nuke; } fi
   if which zathura >/dev/null 2>&1 ; then
-    doc() { _zath; }; else
-    doc() { _term_nuke; }; fi
+    doc()   { _zath; }; else
+    doc()   { _term_prg_nuke; }; fi
   if which nvim >/dev/null 2>&1 ; then
-    txtp() { _nvim; }; inodev() { _nvim; }; else
-    txtp() { _term_nuke; }; fi
+    txtp()  { _nvim; }; inodev() { _nvim; }; else
+    txtp()  { _term_prg_nuke; }; fi
   #if which nvim >/dev/null 2>&1 ; then
   #  alias txtp=_nvim; alias inodev=_nvim; else
-  #  alias txtp=_term_nuke; fi
+  #  alias txtp=_term_prg_nuke; fi
 }
 
 _mime_switch() { # mime switches
@@ -303,6 +302,7 @@ _mime_switch() { # mime switches
 
   case "$mime_curr" in
     video/*) media ;;
+    application/octet-stream) media ;;
     audio/*) media ;;
     image/*) media ;;
     application/pdf) doc ;;
@@ -327,9 +327,7 @@ _p_tabbed_start () { # start tabbed
 
     [ -z "$pid_tabd" ] && { echo "Can't start tabbed"; exit 1; }
     read -r xid < "$fifoy" && rm "$fifoy"
-
-    # note: currently, mpv starts quickest, then nvim, then zath. Thus, its a safe bet to initiate them in a partially reversed order with a slight delay after mpv
-
+    
     _mpvx & sleep 1.9
     _nvimx & sleep 1
     _zathx #change to _zath?
@@ -368,7 +366,7 @@ _foc_viewer_x() { # sol to grab foc of background tabs? #TODO: work in progress
   [ -n "$is_curr_vim"  ] && _win_foc_nvim && return
   [ -n "$is_curr_doc"  ] && _win_foc_zath && return ;}
 
-_tt_sw()  { _prnt "$1" > "$cache_tt_switch"; }
+_tt_sw()  { _prnt "$1" > "$cache_t_swit"; }
 
 _timer() {
   f_start="${f_curr}"
@@ -414,6 +412,7 @@ _kill_all()    { _kill_tabbed; _kill_fifos; _zath_kill; disown; exit 0 ; }
 # body - init ########################################################
 
 _init() { # init sigs
+  _init_var
   _test_fifo
   _set_term
   #unset -v fifox #?
