@@ -35,8 +35,9 @@ tab_zat="3" # zathura tab
 
 # init universals
 
+fifox="$1"
+
 _init_var() {
-  fifox="$1"
   fifoy=""
   
   f_first="$nnn"
@@ -47,6 +48,8 @@ _init_var() {
   mkdir -p "$d_cache"
   cache_t_swit="$d_cache/cache.t.swit"
   cache_f_curr="$d_cache/cache.f_curr"
+
+  printf "y" > "$cache_t_swit" # add this into a 'init' function
   
   [ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
   mime_last="application/pdf" # first visible win is zath
@@ -54,12 +57,12 @@ _init_var() {
   
   xid=""
   pid_view=""
-  pid_tabd=""
+  pid_tbd=""
   soc_mpv=""
-  soc_nvim=""
-  soc_zath=""
+  soc_nvi=""
+  soc_zat=""
   
-  #log_x="$d_cache/uview.log"
+  log_x="$d_cache/uview.log"
   #log_y="$d_cache/uviewy.log"
 }
 
@@ -69,7 +72,7 @@ _init_var() {
 _prnt()             { printf "%s \n" "$@"; }
 _prnt_swit()        { cat "$cache_t_swit"; }
 _prnt_f_cache()     { cat "$cache_f_curr"; }
-_prnt_pid_nvim()    { pgrep -f "nvim --listen ${soc_nvim}"; } #?
+_prnt_pid_nvim()    { pgrep -f "nvim --listen ${soc_nvi}"; } #?
 _prnt_pid_mpv()     { pgrep -f "mpv .*$soc_mpv"; } #?
 _debugx()           { _prnt "$1" >> "$log_x" ; }
 _set_debug()        { _prnt "uview begin:" > "$log_x" ; }
@@ -84,7 +87,6 @@ _set_mime_last()    { mime_last="${mime_curr}"; }
 _set_pid_mpv()      { pid_mpv="$(_prnt_pid_mpv)"; }
 _set_pid_nvim()     { pid_nvim="$(_prnt_pid_mpv)[1]"; } # why [1]?
 
-printf "y" > "$cache_t_swit" # add this into a 'init' function
 
 
 # window/viewers/jobs ########################################
@@ -205,7 +207,7 @@ _mpv() {
 
 # nvim #######################################
 
-_nvimxx() { $prg_term "$xid" -e nvim --listen "${soc_nvim}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
+_nvimxx() { $prg_term "$xid" -e nvim --listen "${soc_nvi}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
 
 _nvim_set() {
   c=1
@@ -225,7 +227,7 @@ _nvim_send() {
     text/*)           ncmd=":view ${f_curr}<CR>" ;;
     inode/directory)  ncmd=":view ${f_curr}/<CR>" ;;
   esac
-  nvim --server "${soc_nvim}" --remote-send "$ncmd" & }
+  nvim --server "${soc_nvi}" --remote-send "$ncmd" & }
 
 _nvim() {
   pid_nvim="$(_prnt_pid_nvim)"
@@ -235,7 +237,7 @@ _nvim() {
 
 # zath #########################################
 
-_prnt_soc_zath() {
+_prnt_soc_zat() {
   dbus-send \
     --session \
     --dest=org.freedesktop.DBus \
@@ -244,12 +246,12 @@ _prnt_soc_zath() {
     /org/freedesktop/DBus       \
     org.freedesktop.DBus.ListNames | sed -nr '/^.*string "(.*zathura.*)"/{s//\1/p;q;}' ;}
 
-_set_soc_zath () { sleep 1; soc_zath="$(_prnt_soc_zath)" ; }
+_set_soc_zat () { sleep 1; soc_zat="$(_prnt_soc_zat)" ; }
 
 _zath_send() { # open file
   dbus-send \
     --session  \
-    --dest="$soc_zath"  \
+    --dest="$soc_zat"  \
     --type=method_call \
     --print-reply      \
     /org/pwmt/zathura  \
@@ -265,18 +267,18 @@ _zath_pid() {
     _debugx "gdbus:"
     gdbus introspect 
       --session \
-      --dest "$soc_zath" \
+      --dest "$soc_zat" \
       --object-path / \
       --only-properties -q >> $log_x
     #grep -oP 'ProcessID=\K\d+'  # Extract ProcessID value using Perl-compatible regular expression
 }
 
-_zath_kill() { [ -n "$soc_zath" ] && kill -9 "$(echo "$soc_zath" | sed -n 's/.*PID-\([0-9]\+\).*/\1/p')"; }
+_zath_kill() { [ -n "$soc_zat" ] && kill -9 "$(echo "$soc_zat" | sed -n 's/.*PID-\([0-9]\+\).*/\1/p')"; }
 
 _zathx() { zathura -e "$xid" "$f_curr" & sleep 0.5s; _set_soc_id; }
 
 _zath() { 
-  [ -n "$(_prnt_soc_zath)" ] && { _zath_send & return; }
+  [ -n "$(_prnt_soc_zat)" ] && { _zath_send & return; }
   _zathx ;}
 
 
@@ -321,17 +323,19 @@ _p_tabbed_start () { # start tabbed
     tabbed -n preview > "$fifoy" &
 
     jobs
-    pid_tabd="$(jobs -p %%)"
-    soc_mpv="/tmp/nnn.${pid_tabd}.mpv"
-    soc_nvim="/tmp/nnn.${pid_tabd}.nvim"
+    pid_tbd="$(jobs -p %%)"
+    fif_nnn="$(echo $fifox | grep -o '[0-9]\+')"
+    soc_mpv="/tmp/nnn.${fif_nnn}.tbd-${pid_tbd}.mpv"
+    soc_nvi="/tmp/nnn.${fif_nnn}.tbd-${pid_tbd}.nvi"
 
-    [ -z "$pid_tabd" ] && { echo "Can't start tabbed"; exit 1; }
+
+    [ -z "$pid_tbd" ] && { echo "Can't start tabbed"; exit 1; }
     read -r xid < "$fifoy" && rm "$fifoy"
     
     _mpvx & sleep 1.9
     _nvimx & sleep 1
     _zathx #change to _zath?
-    _set_soc_zath
+    _set_soc_zat
 
     #_mpv_xa & sleep 1
     #_zathxa & sleep 1
@@ -402,11 +406,11 @@ _kill_viewer() { # viewer
 
 # Cleanup #####################################################
 
-_kill_tabbed() { kill "$pid_tabd"; }
+_kill_tbd() { kill "$pid_tbd"; }
 
-_kill_fifos()  { rm -f "$soc_mpv" "$soc_nvim"; }
+_kill_fif()  { rm -f "$soc_mpv" "$soc_nvi"; }
 
-_kill_all()    { _kill_tabbed; _kill_fifos; _zath_kill; disown; exit 0 ; }
+_kill()    { _kill_tbd; echo "killing fifos" > $log_x; _kill_fif; _zath_kill; disown; exit 0 ; }
 
 
 # body - init ########################################################
@@ -426,35 +430,35 @@ _init() { # init sigs
 
   # init handles
   _mime_handlers
-  _loopx 
+  _set_cache_f_curr
+  _set_mime_curr
+  #_loopx 
   }
 
 
 # body - loop #####################################################
 
-_loop_init() { # init new file arg
-  [ ! -e "$f_curr" ] && continue
-  _set_cache_f_curr
-  _set_mime_curr
-  jobs && if ! jobs | grep tabbed ; then break; fi ; }
+_loop() { # init new file arg
+  while read -r f_curr ; do
+    [ ! -e "$f_curr" ] && continue
+    _set_cache_f_curr
+    _set_mime_curr
+    jobs
+  
+    if ! jobs | grep tabbed ; then 
+      echo "jobs test fail" >> $log_x
+      break
+    fi
+    echo "jobs test pass" >> $log_x
+    echo "   " >> $log_x
+  
+    _foc_viewer_x
+    _mime_switch 
+    _timer &
+  
+    _set_mime_last
+    _win_foc
 
-_loop_view() {
-  _foc_viewer_x
-  _mime_switch 
-  _timer & }
-
-_loop_close() {
-  _set_mime_last
-  _win_foc ;}
-
-_loopx() {
-  _loop_init
-  _loop_view
-  _loop_close ;}
-
-_loop() { 
-  while read -r f_curr ; do 
-    _loopx ; 
   done < "$fifox"; }
 
 
@@ -463,7 +467,7 @@ _loop() {
 _main () {
   _init
   _loop
-  _kill_all ;}
+  _kill ;}
 
 
 _main &
