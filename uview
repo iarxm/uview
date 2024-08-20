@@ -5,239 +5,117 @@
 #
 # file preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
-# dep: tabbed mpv neovim zathura prg_nuke
+# dep: tabbed mpv neovim zathura prg_nuk
 # tabbed configured w relative tabs and new pos = 1
 #
 # ########################################################
 
-# note: currently, mpv starts quickest, then nvim, then zath. Thus, its a safe bet to initiate them in a partially reversed order with a slight delay after mpv
-
-# todo: remove all unecessary code to persistent preview frames..
-#   - a major fraction of this file is unrequired now after simplifying certain problems.
-# todo: implement a 4th tab: with prg_nuke for alternative files that dont fit into those 3 cats
-# todo: focus fixer nnow not required due to mpv update?
+# todo: initialise prgs 
+# todo: refactor whole program
+# todo: 4th tab w. prg_nuk
+# todo: wm focus control
 
 ###########################################################
 
 # init config [TODO:set in a config file]
 
-d_cache="$HOME/.cache/uview"
-t_lim="0.1"
-prg_nuke="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/prg_nuke"
-prg_term="st -c preview -w"
-prg_pager=${prg_pager:-"nvim -R"}
-tab_mpv="1" # mpv tab
-tab_nvi="2" # nvim tab
-tab_zat="3" # zathura tab
-#t_lim_xdot="0.5"
-#t1="100000"
+cache_dir="$HOME/.cache/uview"
+prg_nuk="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/prg_nuk"
+prg_trm="st -c preview -w"
+prg_pgr=${prg_pgr:-"nvim -R"}
+tab_mpv="1"
+tab_nvi="2"
+tab_zat="3"
+tim_lim="0.1"
 
 
 # init universals
 
 fifox="$1"
 
-_init_var() {
+_ini_var() {
+  
+  fil_one="$nnn"
+  fil_cur="$fil_one"
+  { [ -n "$fifox" ] && [ -f "$NNN_FIFO" ]; } && fifox="$NNN_FIFO"
   fifoy=""
   
-  f_first="$nnn"
-  f_curr="$file1"
-  #f_last=""
-  { [ -z "$fifox" ] && [ -f "$NNN_FIFO" ]; } || fifox="$NNN_FIFO"
-  
-  mkdir -p "$d_cache"
-  cache_t_swit="$d_cache/cache.t.swit"
-  cache_f_curr="$d_cache/cache.f_curr"
+  mkdir -p "$cache_dir"
+  cac_tim_swi="$cache_dir/cache.tim_swi"
+  cac_fil_cur="$cache_dir/cache.fil_cur"
 
-  printf "y" > "$cache_t_swit" # add this into a 'init' function
+  printf "y" > "$cac_tim_swi" # add this into a 'init' function
   
-  [ -n "$MPVX" ] && mpvx="$MPVX" || mpvx="mpv"
-  mime_last="application/pdf" # first visible win is zath
-  mime_curr=""
+  [ -n "$MPVX" ] && mpv="$MPVX" || mpv="mpv"
+  mim_las="application/pdf" # first visible win is zath
+  mim_cur=""
   
-  xid=""
-  pid_view=""
+  xid_tbd=""
   pid_tbd=""
   soc_mpv=""
   soc_nvi=""
   soc_zat=""
   
-  log_x="$d_cache/uview.log"
-  #log_y="$d_cache/uviewy.log"
+  log_x="$cache_dir/uviewx.log"
+  log_y="$cache_dir/uviewy.log"
+  #pid_view=""
 }
 
 
-# print ########################################
+# atoms ########################################
 
-_prnt()             { printf "%s \n" "$@"; }
-_prnt_swit()        { cat "$cache_t_swit"; }
-_prnt_f_cache()     { cat "$cache_f_curr"; }
-_prnt_pid_nvim()    { pgrep -f "nvim --listen ${soc_nvi}"; } #?
-_prnt_pid_mpv()     { pgrep -f "mpv .*$soc_mpv"; } #?
-_debugx()           { _prnt "$1" >> "$log_x" ; }
-_set_debug()        { _prnt "uview begin:" > "$log_x" ; }
+_prn()             { printf "%s \n" "$@"; }
+_set_mim_cur()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
+_win_foc_tab()     { xdotool key --window "$xid_tbd" "Ctrl+$1";  _win_foc_main; }
+_tst_fif()         { [ ! -r "$fifox" ] && { echo "fifox read fail ($fifox)"; exit 1; }; }
+_set_cac_fil_cur() { _prn "$fil_cur" > "$cac_fil_cur"; }
+_debugx()          { _prn "$1" >> "$log_x" ; }
 
-
-# set #########################################
-
-_set_cache_f_curr() { _prnt "$f_curr" > "$cache_f_curr"; }
-_set_mime_curr()    { mime_curr=$(file -bL --mime-type "${f_curr}"); }
-_set_mime_last()    { mime_last="${mime_curr}"; }
-
-_set_pid_mpv()      { pid_mpv="$(_prnt_pid_mpv)"; }
-_set_pid_nvim()     { pid_nvim="$(_prnt_pid_mpv)[1]"; } # why [1]?
-
-
-
-# window/viewers/jobs ########################################
-
-_get_win_id()       { xdotool search --pid "$1" | head -1; } # $1 is $pid
-
-_set_viewer_pid ()  { pid_view="$(jobs -p %%)"; }
-_set_fm_win()       { fm_win="$(xdotool getactivewindow)" ; }
-
-_set_winid_mpv()    { winid_mpv="$(_get_win_id "$pid_mpv")"; }
-_set_winid_nvim()   { winid_nvim="$(_get_win_id "$pid_nvim")"; }
-_set_winid_zath()   { winid_nvim="$(_get_win_id "$pid_zath")"; } #TODO
-
-# winid's are not required now?
-
-
-# foc
-
-_win_foc_main()     { xdotool windowactivate "$fm_win"; }
-_win_foc_mainx()    { sleep 0.8s; xdotool windowactivate "$fm_win"; }
-_win_foc_xid()      { xdotool windowactivate "$xid"; }
-_win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1";  _win_foc_main; }
-
-_win_foc_mpv()      { _win_foc_tabx $tab_mpv; }
-_win_foc_nvim()     { _win_foc_tabx $tab_nvi; }
-_win_foc_zath()     { _win_foc_tabx $tab_zat; } #TODO
-
-#_win_foc_tabx()     { _win_foc_xid; xdotool key "Ctrl+$1"; } # _win_foc_main; }
-
-#_win_foc_tabx()     { xdotool key --window "$xid" "Ctrl+$1"; } # _win_foc_main; }
-
-#_win_foc_brute()    { _window_foc_brutex; } # unused?
-
-# behave
-
-_win_foc() {
-  xid_active="$(xdotool getactivewindow)"
-  if [ $((xid_active == xid)) -ne 0 ] ; then
-    xdotool windowactivate "$fm_win"
-    #xdotool windowactivate --sync "${wid_x}" \
-    #else
-      #timeout "$t_lim_xdot" xdotool behave "$xid" focus windowactivate "$fm_win" &
-  fi; }
-
-
-# tests
-
-_mime_test_media()  { _prnt "$1" | grep -e "video" -e "image" -e "audio" ; }
-_mime_test_vim()    { _prnt "$1" | grep -e "text" -e "inode/directory" ; }
-_mime_test_doc()    { _prnt "$1" | grep -e "application/pdf" ; } #todo: epubs..
-
-_test_fifo()        { [ ! -r "$fifox" ] && { echo "\$fifox read fail ('$fifox')"; exit 1; }; }
-
-# wait
-
-_wait() { # creating a while loop instead of sleep x #tod
-  c=1
-  while -z "$1" && $c lt $2 ; do
-    sleep 0.1
-    $3
-  done ;}
-
-
-# mime/progs ###################################################
-
-# term
-
-_set_term() {
-  if which $prg_term >/dev/null 2>&1 ; then
-    prg_term=$prg_term
+_set_trm() { 
+  if which $prg_trm >/dev/null 2>&1 ; then
+    prg_trm=$prg_trm
   elif which st >/dev/null 2>&1 ; then
-    prg_term="st -c preview -w"
+    prg_trm="st -c preview -w"
   elif which urxvt >/dev/null 2>&1 ; then
-    prg_term="urxvt -embed"
+    prg_trm="urxvt -embed"
   elif which xterm >/dev/null 2>&1 ; then
-    prg_term="xterm -into"
+    prg_trm="xterm -into"
   else
-    _prnt "no xembed term found" >&2
+    _prn "no xembed term found" >&2
   fi ;}
 
-# todo: incase prg_nuke is not installed, revert to 'less' or 'pager' as defined in config section
-#if [ -x "$prg_nuke" ] ; then all() { _term_prg_nuke; }
-#  else # shellcheck disable=SC2086
-#    all() { $prg_term "$xid" -e sh -c "echo '$f_curr' | $prg_pager -" & }
-#  fi 
-#txtp()  { $prg_term "$xid" -e $prg_pager "$f_curr" & }
-
-_term_prg_nuke ()  { $prg_term "$xid" -e "$prg_nuke" "$f_curr" & }
+_trm_prg_nuk ()  { $prg_trm "$xid_tbd" -e "$prg_nuk" "$fil_cur" & }
 
 
 # mpv #####################################
 
-_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --focus-on=never --force-window=immediate --idle "${f_curr}" & }
-#_mpvxx() { $mpvx --input-ipc-server="${soc_mpv}" --wid="$xid" --no-focus-on-open --force-window=immediate --idle & }
+_mpv_ini() { $mpv --input-ipc-server="${soc_mpv}" --wid="$xid_tbd" --focus-on=never --force-window=immediate --idle "${fil_cur}" & }
 
-_mpv_set() {
-  c=1
-  while [[ -z "$pid_mpv" && "$c" -lt 10 ]]; do
-    c=$((c + 1))
-    _set_pid_mpv
-    sleep 0.1
-  done ;}
+_mpv_add() { printf '%s\n' "{ \"command\": [\"loadfile\", \"$fil_cur\", \"replace\" ] }" | socat - "${soc_mpv}" &> /dev/null; }
 
-_mpvx() { _mpvxx; 
-  #_mpv_set
-}
-
-_mpv_add() { printf '%s\n' "{ \"command\": [\"loadfile\", \"$f_curr\", \"replace\" ] }" | socat - "${soc_mpv}" &> /dev/null; }
-
-_mpv() { 
-  #[ -n "$pid_mpv" ] || _mpvx
-  #sleep 1
-  _mpv_add ;}
-
-#_mpv_start() { [ -n "$pid_mpv" ] || _mpvy ; }
-#[ -eq "$(_prnt_swit)" = "n" ] && return
+_mpv() { _mpv_add ;}
 
 
 # nvim #######################################
 
-_nvimxx() { $prg_term "$xid" -e nvim --listen "${soc_nvi}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
+_nvi_ini() { $prg_trm "$xid_tbd" -e nvim --listen "${soc_nvi}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
 
-_nvim_set() {
-  c=1
-  while [[ -z "$pid_nvim" && "$c" -lt 10 ]]; do
-    c=$((c + 1))
-    _set_pid_nvim
-    sleep 0.1
-  done ;}
-
-_nvimx() {
-  _nvimxx ;}
-  #_nvim_set ;}
-#[ -z "$pid_nvim" ] && $prg_term "$xid" ;}
-
-_nvim_send() { 
-  case $mime_curr in
-    text/*)           ncmd=":view ${f_curr}<CR>" ;;
-    inode/directory)  ncmd=":view ${f_curr}/<CR>" ;;
+_nvi_snd() { 
+  case $mim_cur in
+    text/*)           ncmd=":view ${fil_cur}<CR>" ;;
+    inode/directory)  ncmd=":view ${fil_cur}/<CR>" ;;
   esac
   nvim --server "${soc_nvi}" --remote-send "$ncmd" & }
 
-_nvim() {
-  pid_nvim="$(_prnt_pid_nvim)"
-  { [ -n "${pid_nvim}" ] && _nvim_send; } \
-    || { _nvimx; _nvim_send; }; }
+_nvi() {
+  pid_nvi="$(pgrep -f "nvim --listen ${soc_nvi}")"
+  { [ -n "${pid_nvi}" ] && _nvi_snd; } \
+    || { _nvi_ini; _nvi_snd; }; }
 
 
-# zath #########################################
+# zat #########################################
 
-_prnt_soc_zat() {
+_soc_prn_zat() {
   dbus-send \
     --session \
     --dest=org.freedesktop.DBus \
@@ -246,9 +124,12 @@ _prnt_soc_zat() {
     /org/freedesktop/DBus       \
     org.freedesktop.DBus.ListNames | sed -nr '/^.*string "(.*zathura.*)"/{s//\1/p;q;}' ;}
 
-_set_soc_zat () { sleep 1; soc_zat="$(_prnt_soc_zat)" ; }
+_kil_zat() { [ -n "$soc_zat" ] && kill -9 "$(echo "$soc_zat" | sed -n 's/.*PID-\([0-9]\+\).*/\1/p')"; }
 
-_zath_send() { # open file
+_soc_set_zat () { sleep 1; soc_zat="$(_soc_prn_zat)" ; }
+
+_zat_snd() { # open file
+  _debugx "zat send; soc_zat: $soc_zat"
   dbus-send \
     --session  \
     --dest="$soc_zat"  \
@@ -256,68 +137,53 @@ _zath_send() { # open file
     --print-reply      \
     /org/pwmt/zathura  \
     org.pwmt.zathura.OpenDocument \
-    string:"${f_curr}" \
+    string:"${fil_cur}" \
     string:'' \
     int32:1 &2>> /dev/null ; }
+
     #int32:1 2>&1 >> $log_y ; }
-    #string:\'"${f_curr}"\' \
+    #string:\'"${fil_cur}"\' \
     #TODO: issues with some filenames
+    #TODO: events that respond to errors (eg respawn zath and init)
 
-_zath_pid() {
-    _debugx "gdbus:"
-    gdbus introspect 
-      --session \
-      --dest "$soc_zat" \
-      --object-path / \
-      --only-properties -q >> $log_x
-    #grep -oP 'ProcessID=\K\d+'  # Extract ProcessID value using Perl-compatible regular expression
-}
+_zat_ini() { 
+  zathura -e "$xid_tbd" "$fil_cur" &
+  _soc_set_zat ;}
 
-_zath_kill() { [ -n "$soc_zat" ] && kill -9 "$(echo "$soc_zat" | sed -n 's/.*PID-\([0-9]\+\).*/\1/p')"; }
-
-_zathx() { zathura -e "$xid" "$f_curr" & sleep 0.5s; _set_soc_id; }
-
-_zath() { 
-  [ -n "$(_prnt_soc_zat)" ] && { _zath_send & return; }
-  _zathx ;}
+_zat() { [ -n "$(_soc_prn_zat)" ] && [ -n "${soc_zat}" ] && { _zat_snd & return; }; _zat_ini ;} # inefficient. improvements?
 
 
 # mime handling #############################
 
-_mime_handlers() {
+_mim_handlers() {
   if which mpv >/dev/null 2>&1 ; then
     media() { _mpv; } else
-    media() { _term_prg_nuke; } fi
+    media() { _trm_prg_nuk; } fi
   if which zathura >/dev/null 2>&1 ; then
-    doc()   { _zath; }; else
-    doc()   { _term_prg_nuke; }; fi
+    doc()   { _zat; }; else
+    doc()   { _trm_prg_nuk; }; fi
   if which nvim >/dev/null 2>&1 ; then
-    txtp()  { _nvim; }; inodev() { _nvim; }; else
-    txtp()  { _term_prg_nuke; }; fi
-  #if which nvim >/dev/null 2>&1 ; then
-  #  alias txtp=_nvim; alias inodev=_nvim; else
-  #  alias txtp=_term_prg_nuke; fi
-}
+    txtp()  { _nvi; }
+    inodev(){ _nvi; }; else
+    txtp()  { _trm_prg_nuk; }; fi ;}
 
-_mime_switch() { # mime switches
-  [ n = $(_prnt_swit) ] && return
-
-  case "$mime_curr" in
-    video/*) media ;;
+_mim_switch() { # mime switches
+  [ n = $(cat "$cac_tim_swi") ] && return
+  case "$mim_cur" in
+    video/*)                  media ;;
     application/octet-stream) media ;;
-    audio/*) media ;;
-    image/*) media ;;
-    application/pdf) doc ;;
-    inode/directory) inodev ;;
-    text/*) txtp ;;
+    audio/*)                  media ;;
+    image/*)                  media ;;
+    application/pdf)          doc ;;
+    inode/directory)          inodev ;;
+    text/*)                   txtp ;;
     #*) all ;;
   esac ;}
 
 
 # tabbed ########################################
 
-
-_p_tabbed_start () { # start tabbed
+_prg_tbd_ini () { # start tabbed
     fifoy="$(mktemp -u)"
     mkfifo "$fifoy"
     tabbed -n preview > "$fifoy" &
@@ -328,67 +194,37 @@ _p_tabbed_start () { # start tabbed
     soc_mpv="/tmp/nnn.${fif_nnn}.tbd-${pid_tbd}.mpv"
     soc_nvi="/tmp/nnn.${fif_nnn}.tbd-${pid_tbd}.nvi"
 
-
     [ -z "$pid_tbd" ] && { echo "Can't start tabbed"; exit 1; }
-    read -r xid < "$fifoy" && rm "$fifoy"
-    
-    _mpvx & sleep 1.9
-    _nvimx & sleep 1
-    _zathx #change to _zath?
-    _set_soc_zat
-
-    #_mpv_xa & sleep 1
-    #_zathxa & sleep 1
-    #_nvim_start & sleep 1
-    #_win_zath_id
-    #_mpv_xa & sleep 0.2
-    #_nvim_start & sleep 0.5
-    #_zathxa & sleep 0.2
-    # required anymore?
-    #i3-msg 'no_focus [id="$xid"]' # i3 props
-    #i3-msg 'for_window [id="$xid"] border 2px'
-    #i3-msg 'for_window [instance="preview"] border 2px' ;}
+    read -r xid_tbd < "$fifoy" && rm "$fifoy"
+   
+    _mpv_ini & sleep 1.9
+    _nvi_ini & sleep 1
+    _zat_ini
   }
+
 
 # focus switches #########################################
 
-_mime_test_last() {
-  is_last_media=$(_mime_test_media "$mime_last")
-  is_last_vim=$(_mime_test_vim "$mime_last")
-  is_last_doc=$(_mime_test_doc "$mime_last") ;}
+_foc_viewer() { # sol to grab foc of background tabs? #TODO: work in progress
+  [ $mim_cur = $mim_las ] && return
 
-_mime_test_curr() {
-  is_curr_media=$(_mime_test_media "$mime_curr")
-  is_curr_vim=$(_mime_test_vim "$mime_curr")
-  is_curr_doc=$(_mime_test_doc "$mime_curr");}
+  case $mim_cur in
+    video/*|image/*|audio/*) _win_foc_tab $tab_mpv ;;
+    text/*|inode/*)          _win_foc_tab $tab_nvi ;;
+    application/pdf)         _win_foc_tab $tab_zat ;;
+  esac ;}
 
-_foc_viewer_x() { # sol to grab foc of background tabs? #TODO: work in progress
-  _mime_test_curr
-  _mime_test_last
-  [ $mime_curr = $mime_last ] && return
-  [ -n "$is_curr_media"  ] && _win_foc_mpv && return
-  [ -n "$is_curr_vim"  ] && _win_foc_nvim && return
-  [ -n "$is_curr_doc"  ] && _win_foc_zath && return ;}
+_tim_swi() { _prn "$1" > "$cac_tim_swi"; }
 
-_tt_sw()  { _prnt "$1" > "$cache_t_swit"; }
-
-_timer() {
-  f_start="${f_curr}"
-  _tt_sw "n"
-  sleep "$t_lim"
-  f_upd="$(_prnt_f_cache)"
-  [ $f_start = $f_upd ] && _tt_sw "y" && return ;}
+_tim() {
+  fil_new="${fil_cur}"
+  _tim_swi "n" # turn off
+  sleep "$tim_lim"
+  fil_upd="$(cat "$cac_fil_cur")"
+  [ $fil_new = $fil_upd ] && _tim_swi "y" && return ;}
  
 
 # viewing - kill #######################################
-
-# archive these functions
-
-#_kill_viewer_pid() { if [ -n "$pid_view" ] && jobs -p | grep "$pid_view"; then kill "$pid_view"; fi; }
-
-#_kill_mpv() { pid_mpv="$(_prnt_pid_mpv)"; [ -n "$pid_mpv" ] && kill "$pid_mpv"; }
-
-#_kill_nvim() { [ -n "$pid_nvim" ] && for i in $pid_nvim; do kill "$i"; done; }
 
 _kill_viewer() { # viewer
   # if last was vid/txt/node: { curm = lastm -> return || otherwise kill }
@@ -404,70 +240,59 @@ _kill_viewer() { # viewer
   #_kill_mpv
   _kill_viewer_pid ; }
 
+
 # Cleanup #####################################################
 
-_kill_tbd() { kill "$pid_tbd"; }
-
-_kill_fif()  { rm -f "$soc_mpv" "$soc_nvi"; }
-
-_kill()    { _kill_tbd; echo "killing fifos" > $log_x; _kill_fif; _zath_kill; disown; exit 0 ; }
+_kil()     { kill "$pid_tbd"; rm -f "$soc_mpv" "$soc_nvi"; _kil_zat; disown; exit 0 ; }
 
 
 # body - init ########################################################
 
-_init() { # init sigs
-  _init_var
-  _test_fifo
-  _set_term
-  #unset -v fifox #?
+_ini() { # init sigs
+  _ini_var
+  _tst_fif
+  _set_trm
   exec >/dev/null 2>&1  # mute from now
   trap _kill_all SIGINT
 
   # init tabbed
-  _set_fm_win
-  _p_tabbed_start
-  _win_foc_mainx &
+  #_set_xid_tbd
+  _prg_tbd_ini
+  #_win_foc_nnn &
 
   # init handles
-  _mime_handlers
-  _set_cache_f_curr
-  _set_mime_curr
-  #_loopx 
+  _mim_handlers
+  _set_cac_fil_cur
+  _set_mim_cur
   }
 
 
-# body - loop #####################################################
+# main #####################################################
 
-_loop() { # init new file arg
-  while read -r f_curr ; do
-    [ ! -e "$f_curr" ] && continue
-    _set_cache_f_curr
-    _set_mime_curr
+_main() { # init new file arg
+  _ini
+
+  while read -r fil_cur ; do
     jobs
-  
     if ! jobs | grep tabbed ; then 
-      echo "jobs test fail" >> $log_x
       break
     fi
-    echo "jobs test pass" >> $log_x
-    echo "   " >> $log_x
+
+    [ ! -e "$fil_cur" ] && continue
+    _set_cac_fil_cur
+    _set_mim_cur
   
-    _foc_viewer_x
-    _mime_switch 
-    _timer &
+    _foc_viewer
+    _mim_switch 
+    _tim &
+    _debug "done"
   
-    _set_mime_last
-    _win_foc
+    mim_las="${mim_cur}"
+    #_win_foc
 
-  done < "$fifox"; }
-
-
-# main #######################################################
-
-_main () {
-  _init
-  _loop
-  _kill ;}
+  done < "$fifox"
+  
+  _kil; }
 
 
 _main &
