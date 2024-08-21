@@ -20,6 +20,7 @@
 # init config [TODO:set in a config file]
 
 cache_dir="$HOME/.cache/uview"
+fil_zat_opn="$HOME/.local/share/abg/zathura.pdf"
 prg_nuk="${XDG_CONFIG_HOME:-$HOME/.config}/nnn/plugins/prg_nuk"
 prg_trm="st -c preview -w"
 prg_pgr=${prg_pgr:-"nvim -R"}
@@ -66,7 +67,11 @@ _ini_var() {
 
 _prn()             { printf "%s \n" "$@"; }
 _set_mim_cur()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
-_win_foc_tab()     { xdotool key --window "$xid_tbd" "Ctrl+$1";  _win_foc_main; }
+_set_xid_nnn()     { xid_nnn="$(xdotool getactivewindow)" ; }
+_win_foc_nnn()     { xdotool windowactivate "$xid_nnn"; }
+_win_foc_nnx()     { sleep 0.1; _win_foc_nnn; }
+_win_nnn_beh()     { timeout "5" xdotool behave "$xid_tbd" focus windowactivate "$xid_nnn" & }
+_win_foc_tab()     { xdotool key --window "$xid_tbd" "Ctrl+$1";  _win_foc_nnn; }
 _tst_fif()         { [ ! -r "$fifox" ] && { echo "fifox read fail ($fifox)"; exit 1; }; }
 _set_cac_fil_cur() { _prn "$fil_cur" > "$cac_fil_cur"; }
 _debugx()          { _prn "$1" >> "$log_x" ; }
@@ -98,7 +103,7 @@ _mpv() { _mpv_add ;}
 
 # nvim #######################################
 
-_nvi_ini() { $prg_trm "$xid_tbd" -e nvim --listen "${soc_nvi}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
+_nvi_ini() { st -c preview-nvim -w "$xid_tbd" -e nvim --listen "${soc_nvi}" -c 'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
 
 _nvi_snd() { 
   case $mim_cur in
@@ -129,7 +134,6 @@ _kil_zat() { [ -n "$soc_zat" ] && kill -9 "$(echo "$soc_zat" | sed -n 's/.*PID-\
 _soc_set_zat () { sleep 1; soc_zat="$(_soc_prn_zat)" ; }
 
 _zat_snd() { # open file
-  _debugx "zat send; soc_zat: $soc_zat"
   dbus-send \
     --session  \
     --dest="$soc_zat"  \
@@ -147,8 +151,12 @@ _zat_snd() { # open file
     #TODO: events that respond to errors (eg respawn zath and init)
 
 _zat_ini() { 
+  _win_nnn_beh
   zathura -e "$xid_tbd" "$fil_cur" &
-  _soc_set_zat ;}
+  _soc_set_zat
+}
+  #sleep 2
+  #_zat "$fil_zat_opn" & }
 
 _zat() { [ -n "$(_soc_prn_zat)" ] && [ -n "${soc_zat}" ] && { _zat_snd & return; }; _zat_ini ;} # inefficient. improvements?
 
@@ -184,6 +192,7 @@ _mim_switch() { # mime switches
 # tabbed ########################################
 
 _prg_tbd_ini () { # start tabbed
+    _set_xid_nnn
     fifoy="$(mktemp -u)"
     mkfifo "$fifoy"
     tabbed -n preview > "$fifoy" &
@@ -196,10 +205,16 @@ _prg_tbd_ini () { # start tabbed
 
     [ -z "$pid_tbd" ] && { echo "Can't start tabbed"; exit 1; }
     read -r xid_tbd < "$fifoy" && rm "$fifoy"
-   
-    _mpv_ini & sleep 1.9
-    _nvi_ini & sleep 1
-    _zat_ini
+  
+    _win_nnn_beh
+    c=1
+    _mpv_ini &
+    while [ "$c" -le "20" ] ; do 
+      sleep 0.1; c=$((c+1))
+      [ -n $(xwininfo -id $xid_tbd -children | grep "mpv") ] && sleep 0.2 && break; done
+    _nvi_ini &
+    #while [ "$c" -le "40" ] ; do sleep 0.1; c=$((c+1)); [ -n $(xwininfo -id $xid_tbd -children | grep "nvim") ] && break; done
+    _zat_ini &
   }
 
 
@@ -255,12 +270,7 @@ _ini() { # init sigs
   exec >/dev/null 2>&1  # mute from now
   trap _kill_all SIGINT
 
-  # init tabbed
-  #_set_xid_tbd
   _prg_tbd_ini
-  #_win_foc_nnn &
-
-  # init handles
   _mim_handlers
   _set_cac_fil_cur
   _set_mim_cur
