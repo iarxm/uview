@@ -17,6 +17,8 @@
 # [ ] TODO: mpv fixes
 # [ ] TODO: mpv pause on switch exception
 # [ ] TODO: switch to python
+# [ ] TODO: zathura dbus filename issues
+# [ ] TODO: mpv filename issues
 
 ###########################################################
 
@@ -108,12 +110,7 @@ _zat_snd() { # open file
     string:"${fil_cur}" \
     string:'' \
     int32:1 &2>> /dev/null & }
-
-    #int32:1 2>&1 >> $log_y ; }
-    #string:\'"${fil_cur}"\' \
-    #TODO: issues with some filenames
-    #TODO: events that respond to errors (eg respawn zath and init)
-
+    
 _zat_x()   { zathura -e "$xid_tbd" "$1" & pid_zat=$!; }
 
 _zat_ini() { 
@@ -145,8 +142,7 @@ _prg_tbd_ini () { # start tabbed
   _win_beh_nnn &
   _mpv_ini & c=1; while [ "${c}" -le "20" ] ; do sleep 0.1; c=$((c+1)); [ -n $(xwininfo -id $xid_tbd -children | grep "mpv") ] && sleep 0.2 && break; done
   _nvi_ini &
-  _zat_ini
-}
+  _zat_ini; }
 
 
 # ini_x ######################################
@@ -206,15 +202,12 @@ _foc_viewer() {
 
 _tim_swi() { _prn "${1}" > "${cac_tim_swi}"; }
 
-fil_nxt=$(timeout 0.05 cat "${fif_z}")
-
 _tim() {
   sleep "0.1"
   fil_nxt=$(timeout 0.05 cat "${fif_z}")
   if [ ${fil_cur} != ${fil_nxt} ]; then
     _tim_swi "n"
     # todo: fix this again
-
     # todo:
     # 2 fifo's??
     #sleep 0.6; fil_lst=$(timeout 0.05 cat "${fif_zx}")
