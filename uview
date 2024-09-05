@@ -18,48 +18,63 @@ fil_cur="${2}"
 
 _prn()         { printf "%s \n" "${@}"; }
 
+
 _prn_deb()     { printf "%s\n" "${1}" >&2; }
 
-_set_mim_cur() { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
 
-_win_foc_tab() { 
+_mim_set() { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
+
+
+_tab_chg() {
+
     xdotool key --window "${xid_tbd}" "Ctrl+${1}"
     xdotool windowactivate "${xid_fmx}"; }
 
-_win_beh_fmx() { 
+
+_win_beh_fmx() {
+
     timeout "2" \
         xdotool behave "${xid_tbd}" focus windowactivate "$xid_fmx"; }
 
 
 # mpv #####################################
 
-_mpv_ini() { 
+_mpv_ini() {
+
     ${mpv} --input-ipc-server="${soc_mpv}" --wid="${xid_tbd}" \
         --focus-on=never --force-window=immediate --idle "${fil_cur}" & }
 
-_mpv_add() { 
+
+_mpv_add() {
+
     printf '%s\n' \
         "{ \"command\": [\"loadfile\", \"${fil_cur}\", \"replace\" ] }" \
         | socat - "${soc_mpv}" &> /dev/null; }
+
 
 _mpv()     { _mpv_add ;}
 
 
 # nvim #######################################
 
-_nvi_ini() { 
+_nvi_ini() {
+
     st -c preview-nvim -w "${xid_tbd}" -e \
         nvim --listen "${soc_nvi}" -c \
             'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
 
-_nvi_snd() { 
+
+_nvi_snd() {
+
     case ${mim_cur} in
         text/*)           ncmd=":view ${fil_cur}<CR>" ;;
         inode/directory)  ncmd=":view ${fil_cur}/<CR>" ;; 
     esac
     nvim --server "${soc_nvi}" --remote-send "${ncmd}" & }
 
+
 _nvi() {
+
   pid_nvi="$(pgrep -f "nvim --listen ${soc_nvi}")"
   { [ -n "${pid_nvi}" ] && _nvi_snd; } \
     || { _nvi_ini; _nvi_snd; }; }
@@ -68,21 +83,25 @@ _nvi() {
 # zat #########################################
 
 _zat_snd() { # open file
+
     dbus-send --session --dest="${soc_zat}" --type=method_call \
         --print-reply \
             /org/pwmt/zathura org.pwmt.zathura.OpenDocument \
             string:"${fil_cur}" \
             string:'' \
             int32:1 &2>> /dev/null & }
-    
+
+
 _zat_x() { zathura -e "${xid_tbd}" "$1" & pid_zat=$!; }
 
-_zat_ini() { 
+
+_zat_ini() {
+
     _win_beh_fmx &
     [ ${mim_cur} = "application/pdf" ] || _zat_x "${fil_zat_ini}"
     _zat_x "${fil_cur}"
     soc_zat="org.pwmt.zathura.PID-${pid_zat}";}
-    #{ sleep 0.3; _foc_viewer; } & }
+
 
 _zat() { { [ -e "/proc/${pid_zat}" ] && _zat_snd && return; }; _zat_ini ;}
 
@@ -100,8 +119,8 @@ _prg_tbd_ini () { # start tabbed
     [ -z "${pid_tbd}" ] && exit 1
     
     soc_xxx="$(echo ${fif_x} | grep -o '[0-9]\+')"
-    soc_mpv="/tmp/uview${soc_xxx}.tbd-${pid_tbd}.mpv"
-    soc_nvi="/tmp/uview${soc_xxx}.tbd-${pid_tbd}.nvi"
+    soc_mpv="/tmp/uview${soc_xxx}.tbd-${pid_tbd}.mpv.soc"
+    soc_nvi="/tmp/uview${soc_xxx}.tbd-${pid_tbd}.nvi.soc"
     
     read -r xid_tbd < "${fif_y}" && rm "${fif_y}"
     
@@ -128,6 +147,8 @@ _ini() {
     declare -g soc_mpv
     declare -g soc_nvi
     declare -g soc_zat
+    
+    declare -g tim_swi="y"
       
     declare -gi c="1"
     declare -gi tab_mpv="1"
@@ -151,13 +172,10 @@ _ini() {
       
     #mkfifo "${fif_zer:=$(mktemp -u)}"
       
-    _set_mim_cur
-    declare -g fil_zat_ini="${HOME}/.cache/blank.pdf"
-    #[ -e "${fil_zat_ini}" ] || { 
-          #echo "# READER" | pandoc -f markdown -o "${fil_zat_ini}"; }
+    _mim_set
     
-    # TODO: make if clauses to set nuke (similar to prg_trm
-    #declare -g prg_nk1="nuke" 
+    declare -g fil_zat_ini="${HOME}/.cache/blank.pdf"
+    
     declare -g prg_nk2="${cfg_hmx}/nnn/plugins/nuke"
     
     : ${prg_nuk:="${prg_nk1:-"${prg_nk2}"}"}
@@ -182,24 +200,27 @@ _ini() {
         inodev(){ _nvi; }; else
         txtp()  { _trm_nuk; }; fi 
 
-    exec >uview.log 2>&1 # debug mode
-    #exec >/dev/null 2>&1  # mute from now
+    exec >/dev/null 2>&1  # mute from now
+    #exec >uview.log 2>&1 # debug mode
 
     trap _kil SIGINT ;}
 
 
 # mime handling #############################
 
-_foc_viewer() {
+_tab_swi() {
+
     [ ${mim_cur} = ${mim_las} ] || \
         case ${mim_cur} in
-            video/*|image/*|audio/*) _win_foc_tab ${tab_mpv} ;;
-            text/*|inode/*)          _win_foc_tab ${tab_nvi} ;;
-            application/pdf)         _win_foc_tab ${tab_zat} ;; 
+            video/*|image/*|audio/*) _tab_chg ${tab_mpv} ;;
+            text/*|inode/*)          _tab_chg ${tab_nvi} ;;
+            application/pdf)         _tab_chg ${tab_zat} ;; 
         esac ;}
 
-_mim_switch() { # mime switches
-    [ n = ${tim_swi} ] || \
+
+_mim_swi() { # mime switches
+
+    [ n = ${tim_swi} ] || {
         case "${mim_cur}" in
             video/*)                  media ;;
             application/octet-stream) media ;;
@@ -208,16 +229,16 @@ _mim_switch() { # mime switches
             application/pdf)          doc ;;
             inode/directory)          inodev ;;
             text/*)                   txtp ;;
-        esac ;} #*) all ;; 
+        esac ;} ;} #*) all ;; 
+
 
 _kil() { 
+
     kill "${pid_tbd}"
     rm -f "${soc_mpv}" "${soc_nvi}"
     exec 3>&-
     disown
     exit 0; }
-#exec {tim_swi_y[1]}>&- 
-#exec 3>&-
 
 
 # main ###########################################
@@ -226,50 +247,20 @@ _main() { # init new file arg
 
     _ini
     _prg_tbd_ini
-  
-    tim_pre=$(date +%s%3N)
 
-    coproc loops {
-        _prn_deb "coproc init"
-
-        while read -r fil_cur ; do
-            _prn_deb "coproc init: loop" 
-            #timeout 0.01 cat < "${fif_x}" tail -n 1 | >&3
+    while read -r fil_cur ; do
+        
+        timeout 0.01 cat < "${fif_x}"
+        #timeout 0.01 cat < "${fif_x}" tail -n 1 | >&3
       
-            jobs; jobs | grep tabbed || break
-            [ ! -e "${fil_cur}" ] && continue
-      
-            #{
-                #tim_cur=$(date +%s%3N)
-                #{ [ $((tim_cur - tim_pre)) -lt ${tim_lim_y} ] && \
-                    #tim_swi="n" || \
-                    #tim_swi="y"; }
-                #tim_pre=${tim_cur}
-            #}
- 
-            _set_mim_cur
-            _foc_viewer
-            _mim_switch
+        jobs; jobs | grep tabbed || break
+        [ ! -e "${fil_cur}" ] && continue
+         
+        _mim_set
+        _tab_swi
+        _mim_swi
         
-            mim_las="${mim_cur}"
-        done
-        
-        _prn_deb "coproc finish"
-    }
- 
-    _prn_deb "init fifo filter"
-
-    while read -r fil_one ; do
-        
-        _prn_deb "init fif_x loop"
-        _prn_deb "fil_one: $fil_one"
-
-        _prn ${fil_one} &>"${loops[1]}"
-        #{ 
-            #_prn ${fil_one}; timeout 0.01 cat < "${fif_x}" | tail -n 1
-        #} &>"${loops[1]}"
-
-        sleep 0.2
+        mim_las="${mim_cur}"
 
     done < "${fif_x}"
 
@@ -277,15 +268,4 @@ _main() { # init new file arg
 
 
 _main &
-
-# arc ###############################################################
-#_trm_nuk ()    { ${prg_trm} "${xid_tbd}" -e "${prg_nuk}" "${fil_cur}" & } 
-#TODO: custom set each particular ${prg_trm}, 
-    #as xid will be specificed differently depending on the term specs
-
-#_set_xid_fmx() { xid_fmx="$(xdotool getactivewindow)" ; }
-#_win_foc_fmx() { xdotool windowactivate "${xid_fmx}"; }
-
-#: ${cac_dir:="${HOME}/.cache/uview"} && {
-    #[ -d "${cac_dir}" ] || mkdir "${cfg_dir}; }
 
