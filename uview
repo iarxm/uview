@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 
-# ######################################################
-# AUTHOR: IAROM MADDEN
+# IAROM MADDEN mail@iarom.org
 #
 # File preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
 # dep: tabbed mpv neovim zathura prg_nuk bash
 # tabbed configured w relative tabs and new pos = 1
-#
-# ####################################################
 
 fif_x="${1}"
 fil_cur="${2}"
 
 
-# atoms ########################################
+# functions
 
 _prn()         { printf "%s \n" "${@}"; }
 
@@ -37,7 +34,8 @@ _win_beh_fmx() {
         xdotool behave "${xid_tbd}" focus windowactivate "$xid_fmx"; }
 
 
-# mpv #####################################
+
+# mpv
 
 _mpv_ini() {
 
@@ -55,7 +53,8 @@ _mpv_add() {
 _mpv()     { _mpv_add ;}
 
 
-# nvim #######################################
+
+# nvim
 
 _nvi_ini() {
 
@@ -80,9 +79,10 @@ _nvi() {
     || { _nvi_ini; _nvi_snd; }; }
 
 
-# zat #########################################
 
-_zat_snd() { # open file
+# zat
+
+_zat_snd() {
 
     dbus-send --session --dest="${soc_zat}" --type=method_call \
         --print-reply \
@@ -106,9 +106,10 @@ _zat_ini() {
 _zat() { { [ -e "/proc/${pid_zat}" ] && _zat_snd && return; }; _zat_ini ;}
 
 
-# tabbed ########################################
 
-_prg_tbd_ini () { # start tabbed
+# tabbed
+
+_prg_tbd_ini () {
 
     xid_fmx="$(xdotool getactivewindow)"
     mkfifo "${fif_y:="$(mktemp -u)"}"
@@ -137,7 +138,8 @@ _prg_tbd_ini () { # start tabbed
     _zat_ini; }
 
 
-# ini_x ######################################
+
+# ini_x
 
 _ini() {
 
