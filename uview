@@ -11,28 +11,22 @@ fif_x="${1}"
 fil_cur="${2}"
 
 
-# functions
-
 _prn()         { printf "%s \n" "${@}"; }
-
-
 _prn_deb()     { printf "%s\n" "${1}" >&2; }
-
-
-_mim_set() { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
+_mim_set()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
 
 
 _tab_chg() {
 
     xdotool key --window "${xid_tbd}" "Ctrl+${1}"
-    xdotool windowactivate "${xid_fmx}"; }
-
+    xdotool windowactivate "${xid_fmx}"
+}
 
 _win_beh_fmx() {
 
     timeout "2" \
-        xdotool behave "${xid_tbd}" focus windowactivate "$xid_fmx"; }
-
+        xdotool behave "${xid_tbd}" focus windowactivate "$xid_fmx"
+}
 
 
 # mpv
@@ -40,15 +34,15 @@ _win_beh_fmx() {
 _mpv_ini() {
 
     ${mpv} --input-ipc-server="${soc_mpv}" --wid="${xid_tbd}" \
-        --focus-on=never --force-window=immediate --idle "${fil_cur}" & }
-
+        --focus-on=never --force-window=immediate --idle "${fil_cur}" &
+}
 
 _mpv_add() {
 
     printf '%s\n' \
         "{ \"command\": [\"loadfile\", \"${fil_cur}\", \"replace\" ] }" \
-        | socat - "${soc_mpv}" &> /dev/null; }
-
+        | socat - "${soc_mpv}" &> /dev/null
+}
 
 _mpv()     { _mpv_add ;}
 
@@ -60,8 +54,8 @@ _nvi_ini() {
 
     st -c preview-nvim -w "${xid_tbd}" -e \
         nvim --listen "${soc_nvi}" -c \
-            'set shortmess+=I | hi CursorLine guibg=black guifg=black' & }
-
+            'set shortmess+=I | hi CursorLine guibg=black guifg=black' &
+}
 
 _nvi_snd() {
 
@@ -69,14 +63,15 @@ _nvi_snd() {
         text/*)           ncmd=":view ${fil_cur}<CR>" ;;
         inode/directory)  ncmd=":view ${fil_cur}/<CR>" ;; 
     esac
-    nvim --server "${soc_nvi}" --remote-send "${ncmd}" & }
-
+    nvim --server "${soc_nvi}" --remote-send "${ncmd}" &
+}
 
 _nvi() {
 
   pid_nvi="$(pgrep -f "nvim --listen ${soc_nvi}")"
   { [ -n "${pid_nvi}" ] && _nvi_snd; } \
-    || { _nvi_ini; _nvi_snd; }; }
+    || { _nvi_ini; _nvi_snd; }
+}
 
 
 
@@ -89,8 +84,8 @@ _zat_snd() {
             /org/pwmt/zathura org.pwmt.zathura.OpenDocument \
             string:"${fil_cur}" \
             string:'' \
-            int32:1 &2>> /dev/null & }
-
+            int32:1 &2>> /dev/null &
+}
 
 _zat_x() { zathura -e "${xid_tbd}" "$1" & pid_zat=$!; }
 
@@ -100,11 +95,14 @@ _zat_ini() {
     _win_beh_fmx &
     [ ${mim_cur} = "application/pdf" ] || _zat_x "${fil_zat_ini}"
     _zat_x "${fil_cur}"
-    soc_zat="org.pwmt.zathura.PID-${pid_zat}";}
+    soc_zat="org.pwmt.zathura.PID-${pid_zat}"
+}
 
+_zat() {
 
-_zat() { { [ -e "/proc/${pid_zat}" ] && _zat_snd && return; }; _zat_ini ;}
-
+    [ -e "/proc/${pid_zat}" ] && _zat_snd && return
+    _zat_ini
+}
 
 
 # tabbed
@@ -135,11 +133,9 @@ _prg_tbd_ini () {
     done
 
     _nvi_ini &
-    _zat_ini; }
+    _zat_ini
+}
 
-
-
-# ini_x
 
 _ini() {
 
@@ -160,8 +156,8 @@ _ini() {
       
     declare -g  cfg_hmx="${XDG_CONFIG_HOME:-"${HOME}/.config"}"
       
-    : ${cfg_dir:="${cfg_hmx}/uview"} && [ -d "${cfg_dir}" ] \
-        || mkdir "${cfg_dir}"
+    : ${cfg_dir:="${cfg_hmx}/uview"} && \
+        [ -d "${cfg_dir}" ] || mkdir "${cfg_dir}"
       
     source "${cfg_dir}/config" 2>/dev/null
     
@@ -205,10 +201,11 @@ _ini() {
     exec >/dev/null 2>&1  # mute from now
     #exec >uview.log 2>&1 # debug mode
 
-    trap _kil SIGINT ;}
+    trap _kil SIGINT
+}
 
 
-# mime handling #############################
+# mime handling
 
 _tab_swi() {
 
@@ -217,12 +214,13 @@ _tab_swi() {
             video/*|image/*|audio/*) _tab_chg ${tab_mpv} ;;
             text/*|inode/*)          _tab_chg ${tab_nvi} ;;
             application/pdf)         _tab_chg ${tab_zat} ;; 
-        esac ;}
+        esac
+}
 
 
-_mim_swi() { # mime switches
+_mim_swi() { # switches
 
-    [ n = ${tim_swi} ] || {
+    [ n = ${tim_swi} ] || \
         case "${mim_cur}" in
             video/*)                  media ;;
             application/octet-stream) media ;;
@@ -231,8 +229,8 @@ _mim_swi() { # mime switches
             application/pdf)          doc ;;
             inode/directory)          inodev ;;
             text/*)                   txtp ;;
-        esac ;} ;} #*) all ;; 
-
+        esac
+} #*) all ;; 
 
 _kil() { 
 
@@ -240,12 +238,11 @@ _kil() {
     rm -f "${soc_mpv}" "${soc_nvi}"
     exec 3>&-
     disown
-    exit 0; }
+    exit 0
+}
 
 
-# main ###########################################
-
-_main() { # init new file arg
+_main() {
 
     _ini
     _prg_tbd_ini
@@ -266,8 +263,7 @@ _main() { # init new file arg
 
     done < "${fif_x}"
 
-    _kil;}
-
+    _kil
+}
 
 _main &
-
