@@ -2,7 +2,7 @@
 
 # IAROM MADDEN mail@iarom.org
 #
-# File preview via tabbed xembed with persistent preview file state
+# file preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
 # dep: tabbed mpv neovim zathura prg_nuk bash
 # tabbed configured w relative tabs and new pos = 1
