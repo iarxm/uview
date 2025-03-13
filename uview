@@ -16,14 +16,14 @@ _prn_deb()     { printf "%s\n" "${1}" >&2; }
 _mim_set()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
 
 
-_tab_chg() {
-
+_tab_chg()
+{
     xdotool key --window "${xid_tbd}" "Ctrl+${1}"
     xdotool windowactivate "${xid_fmx}"
 }
 
-_win_beh_fmx() {
-
+_win_beh_fmx()
+{
     timeout "2" \
         xdotool behave "${xid_tbd}" focus windowactivate "$xid_fmx"
 }
@@ -31,34 +31,33 @@ _win_beh_fmx() {
 
 # mpv
 
-_mpv_ini() {
-
+_mpv_ini()
+{
     ${mpv} --input-ipc-server="${soc_mpv}" --wid="${xid_tbd}" \
         --focus-on=never --force-window=immediate --idle "${fil_cur}" &
 }
 
-_mpv_add() {
-
+_mpv_add()
+{
     printf '%s\n' \
         "{ \"command\": [\"loadfile\", \"${fil_cur}\", \"replace\" ] }" \
         | socat - "${soc_mpv}" &> /dev/null
 }
 
-_mpv()     { _mpv_add ;}
-
+_mpv() { _mpv_add ;}
 
 
 # nvim
 
-_nvi_ini() {
-
+_nvi_ini()
+{
     st -c preview-nvim -w "${xid_tbd}" -e \
         nvim --listen "${soc_nvi}" -c \
             'set shortmess+=I | hi CursorLine guibg=black guifg=black' &
 }
 
-_nvi_snd() {
-
+_nvi_snd()
+{
     case ${mim_cur} in
         text/*)           ncmd=":view ${fil_cur}<CR>" ;;
         inode/directory)  ncmd=":view ${fil_cur}/<CR>" ;; 
@@ -66,8 +65,8 @@ _nvi_snd() {
     nvim --server "${soc_nvi}" --remote-send "${ncmd}" &
 }
 
-_nvi() {
-
+_nvi()
+{
   pid_nvi="$(pgrep -f "nvim --listen ${soc_nvi}")"
   { [ -n "${pid_nvi}" ] && _nvi_snd; } \
     || { _nvi_ini; _nvi_snd; }
@@ -77,8 +76,8 @@ _nvi() {
 
 # zat
 
-_zat_snd() {
-
+_zat_snd()
+{
     dbus-send --session --dest="${soc_zat}" --type=method_call \
         --print-reply \
             /org/pwmt/zathura org.pwmt.zathura.OpenDocument \
@@ -90,16 +89,16 @@ _zat_snd() {
 _zat_x() { zathura -e "${xid_tbd}" "$1" & pid_zat=$!; }
 
 
-_zat_ini() {
-
+_zat_ini()
+{
     _win_beh_fmx &
     [ ${mim_cur} = "application/pdf" ] || _zat_x "${fil_zat_ini}"
     _zat_x "${fil_cur}"
     soc_zat="org.pwmt.zathura.PID-${pid_zat}"
 }
 
-_zat() {
-
+_zat()
+{
     [ -e "/proc/${pid_zat}" ] && _zat_snd && return
     _zat_ini
 }
@@ -107,8 +106,8 @@ _zat() {
 
 # tabbed
 
-_prg_tbd_ini () {
-
+_prg_tbd_ini ()
+{
     xid_fmx="$(xdotool getactivewindow)"
     mkfifo "${fif_y:="$(mktemp -u)"}"
     tabbed -n preview > "${fif_y}" &
@@ -137,8 +136,8 @@ _prg_tbd_ini () {
 }
 
 
-_ini() {
-
+_ini()
+{
     declare -g mim_cur
     declare -g xid_tbd
     declare -g pid_tbd
@@ -207,8 +206,8 @@ _ini() {
 
 # mime handling
 
-_tab_swi() {
-
+_tab_swi()
+{
     [ ${mim_cur} = ${mim_las} ] || \
         case ${mim_cur} in
             video/*|image/*|audio/*) _tab_chg ${tab_mpv} ;;
@@ -218,8 +217,8 @@ _tab_swi() {
 }
 
 
-_mim_swi() { # switches
-
+_mim_swi()
+{
     [ n = ${tim_swi} ] || \
         case "${mim_cur}" in
             video/*)                  media ;;
@@ -232,8 +231,8 @@ _mim_swi() { # switches
         esac
 } #*) all ;; 
 
-_kil() { 
-
+_kil()
+{ 
     kill "${pid_tbd}"
     rm -f "${soc_mpv}" "${soc_nvi}"
     exec 3>&-
@@ -241,9 +240,8 @@ _kil() {
     exit 0
 }
 
-
-_main() {
-
+_main()
+{
     _ini
     _prg_tbd_ini
 
