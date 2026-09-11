@@ -151,25 +151,78 @@ _zat()
 _bok_kil()
 {
     [ -n "${pid_bok}" ] && kill "${pid_bok}" 2> /dev/null
+    [ -n "${fif_bok}" ] && rm -f "${fif_bok}"
     pid_bok=""
     xid_bok=""
+}
+
+_bok_run_kil()
+{
+    [ -n "${pid_bok_run}" ] && kill "${pid_bok_run}" 2> /dev/null
+    [ -n "${pid_bok_ctl}" ] && kill "${pid_bok_ctl}" 2> /dev/null
+    [ -n "${fil_bok_nxt}" ] && rm -f "${fil_bok_nxt}"
+    exit
+}
+
+_bok_run()
+{
+    fif_bok="${1}"
+    bookokrat="${2}"
+    fil_bok="${3}"
+    : ${tim_lim:="0.05"}
+    trap _bok_run_kil SIGHUP SIGINT SIGTERM
+
+    while : ; do
+        "${bookokrat}" --zen-mode "${fil_bok}" &
+        pid_bok_run=$!
+        fil_bok_nxt="$(mktemp)" || exit 1
+        { IFS= read -r fil_nxt < "${fif_bok}"
+            printf '%s\n' "${fil_nxt}" > "${fil_bok_nxt}"; } &
+        pid_bok_ctl=$!
+
+        while [ -e "/proc/${pid_bok_run}" ] && [ ! -s "${fil_bok_nxt}" ] ; do
+            sleep "${tim_lim}"
+        done
+
+        if [ -s "${fil_bok_nxt}" ] ; then
+            kill "${pid_bok_run}" 2> /dev/null
+            wait "${pid_bok_run}" 2> /dev/null
+            fil_bok="$(< "${fil_bok_nxt}")"
+        else
+            kill "${pid_bok_ctl}" 2> /dev/null
+            wait "${pid_bok_ctl}" 2> /dev/null
+            IFS= read -r fil_bok < "${fif_bok}" || {
+                rm -f "${fil_bok_nxt}"; break; }
+        fi
+
+        wait "${pid_bok_ctl}" 2> /dev/null
+        rm -f "${fil_bok_nxt}"
+    done
 }
 
 _bok_ini()
 {
     _win_beh_fmx &
+    mkfifo "${fif_bok:="$(mktemp -u)"}"
     st -c preview-bookokrat -w "${xid_tbd}" -e \
-        "${bookokrat}" "${fil_cur}" &
+        "${0}" --bookokrat-run "${fif_bok}" "${bookokrat}" "${fil_cur}" &
     pid_bok=$!
     fil_bok="${fil_cur}"
     c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"
+}
+
+_bok_add()
+{
+    printf '%s\n' "${fil_cur}" > "${fif_bok}"
+    fil_bok="${fil_cur}"
 }
 
 _bok()
 {
     [ "${fil_cur}" = "${fil_bok}" ] && \
         [ -n "${pid_bok}" ] && [ -e "/proc/${pid_bok}" ] && return
-    _bok_kil
+    [ -n "${pid_bok}" ] && [ -e "/proc/${pid_bok}" ] \
+        && { _bok_add; return; }
     _bok_ini
 }
 
@@ -218,6 +271,7 @@ _ini()
     declare -g pid_bok
     declare -g fil_bok
     declare -g xid_bok
+    declare -g fif_bok
     
     declare -g tim_swi="y"
       
@@ -375,6 +429,11 @@ _main()
     done < "${fif_x}"
 
     _kil
+}
+
+[ "${1}" = "--bookokrat-run" ] && {
+    _bok_run "${2}" "${3}" "${4}"
+    exit
 }
 
 _main &
