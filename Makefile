@@ -7,4 +7,3 @@ all:
 install:
 	install -d $(BINDIR)
 	install -m 755 uview $(BINDIR)
-

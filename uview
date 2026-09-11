@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# IAROM MADDEN mail@iarom.org
-#
+# iarom mail@iarom.org
+
 # file preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
 # dep: tabbed mpv neovim bookokrat zathura prg_nuk bash
