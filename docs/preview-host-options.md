@@ -6,6 +6,22 @@
 pair for text, and historically Zathura for PDFs.  This works only when a
 preview program implements XEmbed; it is not a general GUI embedding API.
 
+## Bookokrat terminal host
+
+This worktree defaults `doc_prv=bookokrat`.  It launches Bookokrat in an
+embedded terminal:
+
+```
+st -c preview-bookokrat -w <tabbed-XID> -e bookokrat <document>
+```
+
+Bookokrat has no public command to replace the document in a running reader,
+so uview stops the previous embedded `st` process before starting the next
+document.  PDF and DJVU rendering requires the planned graphics-capable `st`;
+EPUB does not.  Set `doc_prv=image` to retain the Phase 1 PNG-to-mpv PDF
+prototype.  This route remains experimental until it passes the live tabbed
+transition matrix.
+
 Current Zathura (`2026.07.18`) is GTK4-based and has no `-e XID` XEmbed
 option.  GTK4 Zathura cannot be a supported child of `tabbed`.  Do not use
 `xdotool windowreparent` as a replacement: it does not make a client XEmbed

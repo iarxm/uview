@@ -4,7 +4,7 @@
 #
 # file preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
-# dep: tabbed mpv neovim zathura prg_nuk bash
+# dep: tabbed mpv neovim bookokrat zathura prg_nuk bash
 # tabbed configured w relative tabs and new pos = 1
 
 fif_x="${1}"
@@ -140,6 +140,34 @@ _zat()
 }
 
 
+# bookokrat
+
+_bok_kil()
+{
+    [ -n "${pid_bok}" ] && kill "${pid_bok}" 2> /dev/null
+    pid_bok=""
+    xid_bok=""
+}
+
+_bok_ini()
+{
+    _win_beh_fmx &
+    st -c preview-bookokrat -w "${xid_tbd}" -e \
+        "${bookokrat}" "${fil_cur}" &
+    pid_bok=$!
+    fil_bok="${fil_cur}"
+    c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"
+}
+
+_bok()
+{
+    [ "${fil_cur}" = "${fil_bok}" ] && \
+        [ -n "${pid_bok}" ] && [ -e "/proc/${pid_bok}" ] && return
+    _bok_kil
+    _bok_ini
+}
+
+
 # tabbed
 
 _prg_tbd_ini ()
@@ -181,6 +209,9 @@ _ini()
     declare -g xid_mpv
     declare -g xid_nvi
     declare -g xid_zat
+    declare -g pid_bok
+    declare -g fil_bok
+    declare -g xid_bok
     
     declare -g tim_swi="y"
       
@@ -199,6 +230,7 @@ _ini()
     
     : ${tim_lim:="0.05"}
     : ${tim_lim_y:="200"}
+    : ${doc_prv:="bookokrat"}
     : ${pdf_prv:="image"}
     : ${pdf_pag:="1"}
     : ${pdf_dpi:="100"}
@@ -221,6 +253,7 @@ _ini()
     : ${prg_pgr:="nvim -R"}
     : ${prg_trm:="st -c preview -w"}
     : ${mpv:="${MPVX:="mpv"}"}
+    : ${bookokrat:="bookokrat"}
      
     if which ${prg_trm} >/dev/null 2>&1 ; then :
     elif which st       >/dev/null 2>&1 ; then prg_trm="st -c preview -w"
@@ -231,7 +264,9 @@ _ini()
     if which mpv     >/dev/null 2>&1 ; then
         media() { _mpv; } else
         media() { _trm_nuk; } fi
-    if [ "${pdf_prv}" = "image" ] && which pdftocairo >/dev/null 2>&1 ; then
+    if [ "${doc_prv}" = "bookokrat" ] && which ${bookokrat} >/dev/null 2>&1 ; then
+        doc()   { _bok; }
+    elif [ "${pdf_prv}" = "image" ] && which pdftocairo >/dev/null 2>&1 ; then
         doc()   { _pdf; }
     elif which zathura >/dev/null 2>&1 ; then
         doc()   { _zat; }; else
@@ -262,7 +297,12 @@ _tab_swi()
                 c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"; }
                 _tab_chg "${xid_nvi}" \
                 || xdotool key --window "${xid_tbd}" "Ctrl+${tab_nvi}" ;;
-            application/pdf)         case ${pdf_prv} in
+            application/pdf)         case ${doc_prv} in
+                bookokrat) [ -n "${xid_bok}" ] || {
+                    c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"; }
+                    _tab_chg "${xid_bok}" \
+                    || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
+                *)     case ${pdf_prv} in
                 image) [ -n "${xid_mpv}" ] || {
                     c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
                     _tab_chg "${xid_mpv}" \
@@ -271,7 +311,12 @@ _tab_swi()
                     c="1"; xid_zat="$(_tab_win_get "${pid_zat}")"; }
                     _tab_chg "${xid_zat}" \
                     || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
-                esac ;;
+                esac ;; esac ;;
+            application/epub+zip|application/x-djvu|image/vnd.djvu) \
+                                   [ -n "${xid_bok}" ] || {
+                                       c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"; }
+                                   _tab_chg "${xid_bok}" \
+                                   || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
         esac
 }
 
@@ -285,6 +330,9 @@ _mim_swi()
             audio/*)                  media ;;
             image/*)                  media ;;
             application/pdf)          doc ;;
+            application/epub+zip)     doc ;;
+            application/x-djvu)       doc ;;
+            image/vnd.djvu)           doc ;;
             inode/directory)          inodev ;;
             text/*)                   txtp ;;
         esac
@@ -293,6 +341,7 @@ _mim_swi()
 _kil()
 { 
     kill "${pid_tbd}"
+    _bok_kil
     rm -f "${soc_mpv}" "${soc_nvi}"
     exec 3>&-
     disown
