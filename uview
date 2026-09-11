@@ -102,7 +102,7 @@ _nvi_ini()
 _nvi_snd()
 {
     case ${mim_cur} in
-        text/*|text/x-diff) ncmd=":view ${fil_cur}<CR>" ;;
+        text/*|text/x-diff|application/mbox) ncmd=":view ${fil_cur}<CR>" ;;
         inode/directory)  ncmd=":view ${fil_cur}/<CR>" ;; 
     esac
     nvim --server "${soc_nvi}" --remote-send "${ncmd}" &
@@ -360,7 +360,7 @@ _tab_swi()
             video/*|image/*|audio/*) [ -n "${xid_mpv}" ] || {
                 c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
                 _tab_chg_key "${tab_mpv}" ;;
-            text/*|text/x-diff|inode/*) _tab_chg_key "${tab_nvi}" ;;
+            text/*|text/x-diff|application/mbox|inode/*) _tab_chg_key "${tab_nvi}" ;;
             application/pdf)         case ${doc_prv} in
                 bookokrat) [ -n "${xid_bok}" ] || {
                     c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"; }
@@ -398,7 +398,7 @@ _mim_swi()
             application/x-djvu)       doc ;;
             image/vnd.djvu)           doc ;;
             inode/directory)          inodev ;;
-            text/*|text/x-diff)       txtp ;;
+            text/*|text/x-diff|application/mbox) txtp ;;
         esac
 } #*) all ;; 
 
