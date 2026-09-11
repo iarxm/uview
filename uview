@@ -360,10 +360,7 @@ _tab_swi()
             video/*|image/*|audio/*) [ -n "${xid_mpv}" ] || {
                 c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
                 _tab_chg_key "${tab_mpv}" ;;
-            text/*|text/x-diff|inode/*) [ -n "${xid_nvi}" ] || {
-                c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"; }
-                _tab_chg "${xid_nvi}" \
-                || xdotool key --window "${xid_tbd}" "Ctrl+${tab_nvi}" ;;
+            text/*|text/x-diff|inode/*) _tab_chg_key "${tab_nvi}" ;;
             application/pdf)         case ${doc_prv} in
                 bookokrat) [ -n "${xid_bok}" ] || {
                     c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"; }
