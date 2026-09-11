@@ -7,6 +7,8 @@
 # dep: tabbed mpv neovim bookokrat zathura prg_nuk bash
 # tabbed configured w relative tabs and new pos = 1
 
+bok_zen="n"
+[ "${1}" = "--zen-mode" ] && { bok_zen="y"; shift; }
 fif_x="${1}"
 fil_cur="${2}"
 
@@ -169,11 +171,16 @@ _bok_run()
     fif_bok="${1}"
     bookokrat="${2}"
     fil_bok="${3}"
+    bok_zen="${4:-"n"}"
     : ${tim_lim:="0.05"}
     trap _bok_run_kil SIGHUP SIGINT SIGTERM
 
     while : ; do
-        "${bookokrat}" --zen-mode "${fil_bok}" &
+        if [ "${bok_zen}" = "y" ] ; then
+            "${bookokrat}" --zen-mode "${fil_bok}" &
+        else
+            "${bookokrat}" "${fil_bok}" &
+        fi
         pid_bok_run=$!
         fil_bok_nxt="$(mktemp)" || exit 1
         { IFS= read -r fil_nxt < "${fif_bok}"
@@ -205,7 +212,7 @@ _bok_ini()
     _win_beh_fmx &
     mkfifo "${fif_bok:="$(mktemp -u)"}"
     st -c preview-bookokrat -w "${xid_tbd}" -e \
-        "${0}" --bookokrat-run "${fif_bok}" "${bookokrat}" "${fil_cur}" &
+        "${0}" --bookokrat-run "${fif_bok}" "${bookokrat}" "${fil_cur}" "${bok_zen}" &
     pid_bok=$!
     fil_bok="${fil_cur}"
     c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"
@@ -432,7 +439,7 @@ _main()
 }
 
 [ "${1}" = "--bookokrat-run" ] && {
-    _bok_run "${2}" "${3}" "${4}"
+    _bok_run "${2}" "${3}" "${4}" "${5}"
     exit
 }
 

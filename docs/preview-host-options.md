@@ -12,16 +12,17 @@ This worktree defaults `doc_prv=bookokrat`.  It launches Bookokrat in an
 embedded terminal:
 
 ```
-st -c preview-bookokrat -w <tabbed-XID> -e uview --bookokrat-run <FIFO> bookokrat <document>
+st -c preview-bookokrat -w <tabbed-XID> -e uview --bookokrat-run <FIFO> bookokrat <document> <zen-mode>
 ```
 
 Bookokrat has no public command to replace the document in a running reader,
 so the runner receives the next path through its private FIFO, stops the
 current Bookokrat child, and starts a replacement without recreating `st`.
-Bookokrat always starts with `--zen-mode`.  PDF and DJVU rendering requires
-the planned graphics-capable `st`; EPUB does not.  Set `doc_prv=image` to
-retain the Phase 1 PNG-to-mpv PDF prototype.  This route remains experimental
-until it passes the live tabbed transition matrix.
+`uview --zen-mode` passes `--zen-mode` to Bookokrat; the default leaves it
+off.  PDF and DJVU rendering requires the planned graphics-capable `st`; EPUB
+does not.  Set `doc_prv=image` to retain the Phase 1 PNG-to-mpv PDF prototype.
+This route remains experimental until it passes the live tabbed transition
+matrix.
 
 Current Zathura (`2026.07.18`) is GTK4-based and has no `-e XID` XEmbed
 option.  GTK4 Zathura cannot be a supported child of `tabbed`.  Do not use
