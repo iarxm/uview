@@ -24,6 +24,12 @@ _tab_chg()
     xdotool windowactivate "${xid_fmx}"
 }
 
+_tab_chg_key()
+{
+    xdotool key --window "${xid_tbd}" "Ctrl+${1}"
+    xdotool windowactivate "${xid_fmx}"
+}
+
 _tab_win_get()
 {
     while [ "${c}" -le "5" ] ; do
@@ -291,8 +297,7 @@ _tab_swi()
         case ${mim_cur} in
             video/*|image/*|audio/*) [ -n "${xid_mpv}" ] || {
                 c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
-                _tab_chg "${xid_mpv}" \
-                || xdotool key --window "${xid_tbd}" "Ctrl+${tab_mpv}" ;;
+                _tab_chg_key "${tab_mpv}" ;;
             text/*|inode/*)          [ -n "${xid_nvi}" ] || {
                 c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"; }
                 _tab_chg "${xid_nvi}" \
