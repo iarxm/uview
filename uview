@@ -18,8 +18,22 @@ _mim_set()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
 
 _tab_chg()
 {
-    xdotool key --window "${xid_tbd}" "Ctrl+${1}"
+    [ -n "${1}" ] || return 1
+    xprop -id "${xid_tbd}" -f _TABBED_SELECT_TAB 8s \
+        -set _TABBED_SELECT_TAB "0x$(printf '%x' "${1}")" || return
     xdotool windowactivate "${xid_fmx}"
+}
+
+_tab_win_get()
+{
+    while [ "${c}" -le "5" ] ; do
+        sleep "${tim_lim}"; c=$((c+1))
+        xid_prg="$(xdotool search --pid "${1}" 2>/dev/null | head -n 1)"
+        [ -n "${xid_prg}" ] && \
+            [ "$(xwininfo -id "${xid_prg}" -tree 2>/dev/null \
+                | awk '/Parent window id:/ { print $4 }')" = "${xid_tbd}" ] && {
+                printf '%s' "${xid_prg}"; return; }
+    done
 }
 
 _win_beh_fmx()
@@ -35,17 +49,37 @@ _mpv_ini()
 {
     ${mpv} --input-ipc-server="${soc_mpv}" --wid="${xid_tbd}" \
         --focus-on=never --force-window=immediate --idle "${fil_cur}" &
+    pid_mpv=$!
 }
 
 _mpv_add()
 {
     printf '%s\n' \
-        "{ \"command\": [\"loadfile\", \"${fil_cur}\", \"replace\" ] }" \
+        "{ \"command\": [\"loadfile\", \"${1:-"${fil_cur}"}\", \"replace\" ] }" \
         | socat - "${soc_mpv}" &> /dev/null
 }
 
 _mpv() { _mpv_add ;}
 
+
+# pdf
+
+_pdf_rnd()
+{
+    pdf_mtim="$(stat -Lc '%Y' "${fil_cur}")" || return
+    pdf_sum="$(printf '%s\0' "${fil_cur}" | sha256sum | awk '{ print $1 }')"
+    fil_pdf="${dir_pdf}/${pdf_sum}-${pdf_mtim}-${pdf_pag}-${pdf_dpi}.png"
+    [ -r "${fil_pdf}" ] && return
+
+    dir_tmp="$(mktemp -d "${dir_pdf}/.render.XXXXXX")" || return
+    pdftocairo -f "${pdf_pag}" -l "${pdf_pag}" -singlefile -png \
+        -r "${pdf_dpi}" "${fil_cur}" "${dir_tmp}/page" \
+        && mv "${dir_tmp}/page.png" "${fil_pdf}" || {
+            /bin/rm -rf "${dir_tmp}"; return 1; }
+    /bin/rm -rf "${dir_tmp}"
+}
+
+_pdf() { _pdf_rnd && _mpv_add "${fil_pdf}"; }
 
 # nvim
 
@@ -54,6 +88,7 @@ _nvi_ini()
     st -c preview-nvim -w "${xid_tbd}" -e \
         nvim --listen "${soc_nvi}" -c \
             'set shortmess+=I | hi CursorLine guibg=black guifg=black' &
+    pid_trm=$!
 }
 
 _nvi_snd()
@@ -94,6 +129,7 @@ _zat_ini()
     _win_beh_fmx &
     [ ${mim_cur} = "application/pdf" ] || _zat_x "${fil_zat_ini}"
     _zat_x "${fil_cur}"
+    c="1"; xid_zat="$(_tab_win_get "${pid_zat}")"
     soc_zat="org.pwmt.zathura.PID-${pid_zat}"
 }
 
@@ -124,15 +160,11 @@ _prg_tbd_ini ()
     
     _win_beh_fmx &
     _mpv_ini
-    
-    while [ "${c}" -le "20" ] ; do 
-        sleep 0.1; c=$((c+1))
-        [ -n $(xwininfo -id ${xid_tbd} -children | grep "mpv") ] && {
-            sleep 0.2; break; }
-    done
 
-    _nvi_ini &
-    _zat_ini
+    c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"
+    _nvi_ini
+    c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"
+    [ "${pdf_prv}" = "image" ] || _zat_ini
 }
 
 
@@ -144,6 +176,11 @@ _ini()
     declare -g soc_mpv
     declare -g soc_nvi
     declare -g soc_zat
+    declare -g pid_mpv
+    declare -g pid_trm
+    declare -g xid_mpv
+    declare -g xid_nvi
+    declare -g xid_zat
     
     declare -g tim_swi="y"
       
@@ -151,7 +188,7 @@ _ini()
     declare -gi tab_mpv="1"
     declare -gi tab_nvi="2"
     declare -gi tab_zat="3"
-    declare -g  mim_las="application/pdf" # last preview prg to load
+    declare -g  mim_las # last preview prg to load
       
     declare -g  cfg_hmx="${XDG_CONFIG_HOME:-"${HOME}/.config"}"
       
@@ -160,8 +197,11 @@ _ini()
       
     source "${cfg_dir}/config" 2>/dev/null
     
-    : ${tim_lim:="0.1"}
+    : ${tim_lim:="0.05"}
     : ${tim_lim_y:="200"}
+    : ${pdf_prv:="image"}
+    : ${pdf_pag:="1"}
+    : ${pdf_dpi:="100"}
     : ${fil_cur:="${nnn}"}
     : ${fif_x:="${NNN_FIFO}"}
       
@@ -172,6 +212,8 @@ _ini()
     _mim_set
     
     declare -g fil_zat_ini="${HOME}/.cache/blank.pdf"
+    declare -g dir_pdf="${XDG_CACHE_HOME:-"${HOME}/.cache"}/uview/pdf"
+    [ "${pdf_prv}" != "image" ] || mkdir -p "${dir_pdf}"
     
     declare -g prg_nk2="${cfg_hmx}/nnn/plugins/nuke"
     
@@ -189,7 +231,9 @@ _ini()
     if which mpv     >/dev/null 2>&1 ; then
         media() { _mpv; } else
         media() { _trm_nuk; } fi
-    if which zathura >/dev/null 2>&1 ; then
+    if [ "${pdf_prv}" = "image" ] && which pdftocairo >/dev/null 2>&1 ; then
+        doc()   { _pdf; }
+    elif which zathura >/dev/null 2>&1 ; then
         doc()   { _zat; }; else
         doc()   { _trm_nuk; }; fi
     if which nvim    >/dev/null 2>&1 ; then
@@ -210,9 +254,24 @@ _tab_swi()
 {
     [ ${mim_cur} = ${mim_las} ] || \
         case ${mim_cur} in
-            video/*|image/*|audio/*) _tab_chg ${tab_mpv} ;;
-            text/*|inode/*)          _tab_chg ${tab_nvi} ;;
-            application/pdf)         _tab_chg ${tab_zat} ;; 
+            video/*|image/*|audio/*) [ -n "${xid_mpv}" ] || {
+                c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
+                _tab_chg "${xid_mpv}" \
+                || xdotool key --window "${xid_tbd}" "Ctrl+${tab_mpv}" ;;
+            text/*|inode/*)          [ -n "${xid_nvi}" ] || {
+                c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"; }
+                _tab_chg "${xid_nvi}" \
+                || xdotool key --window "${xid_tbd}" "Ctrl+${tab_nvi}" ;;
+            application/pdf)         case ${pdf_prv} in
+                image) [ -n "${xid_mpv}" ] || {
+                    c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
+                    _tab_chg "${xid_mpv}" \
+                    || xdotool key --window "${xid_tbd}" "Ctrl+${tab_mpv}" ;;
+                *)     [ -n "${xid_zat}" ] || {
+                    c="1"; xid_zat="$(_tab_win_get "${pid_zat}")"; }
+                    _tab_chg "${xid_zat}" \
+                    || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
+                esac ;;
         esac
 }
 
