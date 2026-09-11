@@ -176,10 +176,11 @@ _bok_run()
     trap _bok_run_kil SIGHUP SIGINT SIGTERM
 
     while : ; do
+        # Background jobs otherwise receive /dev/null as standard input.
         if [ "${bok_zen}" = "y" ] ; then
-            "${bookokrat}" --zen-mode "${fil_bok}" &
+            "${bookokrat}" --zen-mode "${fil_bok}" < /dev/tty &
         else
-            "${bookokrat}" "${fil_bok}" &
+            "${bookokrat}" "${fil_bok}" < /dev/tty &
         fi
         pid_bok_run=$!
         fil_bok_nxt="$(mktemp)" || exit 1

@@ -24,6 +24,10 @@ does not.  Set `doc_prv=image` to retain the Phase 1 PNG-to-mpv PDF prototype.
 This route remains experimental until it passes the live tabbed transition
 matrix.
 
+The runner explicitly attaches each background Bookokrat child to the
+embedded terminal's `/dev/tty`; otherwise non-interactive Bash supplies
+`/dev/null` as standard input and Bookokrat cannot probe graphics support.
+
 Current Zathura (`2026.07.18`) is GTK4-based and has no `-e XID` XEmbed
 option.  GTK4 Zathura cannot be a supported child of `tabbed`.  Do not use
 `xdotool windowreparent` as a replacement: it does not make a client XEmbed
