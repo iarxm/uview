@@ -9,3 +9,59 @@ selection issue and improvement backlog.
 
 Use `uview --zen-mode [FIFO [FILE]]` to start Bookokrat document previews in
 zen mode. The default leaves Bookokrat's sidebar visible.
+
+Set `doc_prv=tdf` in `~/.config/uview/config` to use TDF for PDF previews.
+Bookokrat remains the default (`doc_prv=bookokrat`) and continues to handle
+EPUB and DjVu previews when TDF is selected.
+
+## Configuration
+
+`uview` sources `~/.config/uview/config` when it starts. All settings are
+optional; these are the supported overrides:
+
+```sh
+# Document previewer: bookokrat (default) or tdf (PDF only)
+doc_prv=bookokrat
+
+# Bookokrat: set to y, or use uview --zen-mode
+bok_zen=n
+
+# PDF fallback: image (default, rendered through mpv), or another value to
+# prefer Zathura when doc_prv is not bookokrat or tdf.
+pdf_prv=image
+pdf_pag=1
+pdf_dpi=100
+
+# Command overrides
+mpv=mpv
+bookokrat=bookokrat
+tdf=tdf
+
+# Poll interval, in seconds, for embedded document-reader changes
+tim_lim=0.05
+
+# Set to n only to suppress MIME-driven preview loading while diagnosing.
+tim_swi=y
+```
+
+`pdf_pag` and `pdf_dpi` apply only to the `pdf_prv=image` fallback. Command
+overrides are useful for pinned local builds or wrapper scripts.
+
+The default configuration is installed as
+`/usr/local/share/uview/config` (adjusted by `PREFIX`). Install a personal
+copy without replacing an existing one with:
+
+```sh
+uview --install-config
+```
+
+Use `uview --install-config --force` only when you intend to replace the
+existing personal configuration.
+
+## Installation
+
+`make install` installs the program to `/usr/local/bin` and the default
+configuration to `/usr/local/share/uview/config`. If another `uview` command
+is found on `PATH`, it reports the path and asks whether to continue. It never
+removes a system-managed package; use the system package manager yourself if
+you decide to remove that version.

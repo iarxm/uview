@@ -1,0 +1,26 @@
+# uview default configuration
+#
+# Copy this file with: uview --install-config
+# Local values override uview's built-in defaults.
+
+# Document previewer: bookokrat (default) or tdf (PDF only).
+doc_prv=bookokrat
+
+# Bookokrat display mode: y for zen mode, n for the sidebar.
+bok_zen=n
+
+# PDF fallback when doc_prv is neither bookokrat nor tdf.
+pdf_prv=image
+pdf_pag=1
+pdf_dpi=100
+
+# Command overrides.
+mpv=mpv
+bookokrat=bookokrat
+tdf=tdf
+
+# Poll interval, in seconds, for embedded document-reader changes.
+tim_lim=0.05
+
+# Set to n only while diagnosing MIME dispatch.
+tim_swi=y

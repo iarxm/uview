@@ -4,18 +4,53 @@
 
 # file preview via tabbed xembed with persistent preview file state
 # files are sent to previewer via interface/server method
-# dep: tabbed mpv neovim bookokrat zathura prg_nuk bash
+# dep: tabbed mpv neovim bookokrat tdf zathura prg_nuk bash
 # tabbed configured w relative tabs and new pos = 1
-
-bok_zen="n"
-[ "${1}" = "--zen-mode" ] && { bok_zen="y"; shift; }
-fif_x="${1}"
-fil_cur="${2}"
-
 
 _prn()         { printf "%s \n" "${@}"; }
 _prn_deb()     { printf "%s\n" "${1}" >&2; }
 _mim_set()     { mim_cur=$(file -bL --mime-type "${fil_cur}"); }
+
+_cfg_ins()
+{
+    cfg_hmx="${XDG_CONFIG_HOME:-"${HOME}/.config"}"
+    cfg_dir="${cfg_hmx}/uview"
+    fil_cfg="${cfg_dir}/config"
+    prg_src="${BASH_SOURCE[0]}"
+    case "${prg_src}" in
+        /*|*/*) ;;
+        *) prg_src="$(command -v "${prg_src}")" || return 1 ;;
+    esac
+    prg_dir="$(CDPATH= cd -- "$(dirname -- "${prg_src}")" && pwd)" || return 1
+    fil_def="${UVIEW_CONFIG_DEFAULT:-"${prg_dir}/../share/uview/config"}"
+    [ -r "${fil_def}" ] || fil_def="${prg_dir}/config"
+    [ -r "${fil_def}" ] || {
+        _prn "default config not found (${fil_def})" >&2; return 1; }
+
+    [ "${1}" = "--force" ] || [ ! -e "${fil_cfg}" ] || {
+        _prn "config exists (${fil_cfg}); use --install-config --force to replace it" >&2
+        return 1
+    }
+    install -d -m 755 "${cfg_dir}" && \
+        install -m 644 "${fil_def}" "${fil_cfg}" || return
+    _prn "installed ${fil_cfg}"
+}
+
+case "${1}" in
+    --install-config)
+        _cfg_ins "${2}"
+        exit ;;
+    --help|-h)
+        _prn "usage: uview [--zen-mode] [FIFO [FILE]]"
+        _prn "       uview --install-config [--force]"
+        exit ;;
+esac
+
+uview_zen_cli="n"
+[ "${1}" = "--zen-mode" ] && { uview_zen_cli="y"; shift; }
+bok_zen="${uview_zen_cli}"
+fif_x="${1}"
+fil_cur="${2}"
 
 
 _tab_chg()
@@ -235,6 +270,43 @@ _bok()
 }
 
 
+# tdf
+
+_tdf_kil()
+{
+    [ -n "${pid_tdf}" ] && kill "${pid_tdf}" 2> /dev/null
+    [ -n "${fif_tdf}" ] && rm -f "${fif_tdf}"
+    pid_tdf=""
+    xid_tdf=""
+}
+
+_tdf_ini()
+{
+    _win_beh_fmx &
+    mkfifo "${fif_tdf:="$(mktemp -u)"}"
+    st -c preview-tdf -w "${xid_tbd}" -e \
+        "${0}" --document-run "${fif_tdf}" "${tdf}" "${fil_cur}" &
+    pid_tdf=$!
+    fil_tdf="${fil_cur}"
+    c="1"; xid_tdf="$(_tab_win_get "${pid_tdf}")"
+}
+
+_tdf_add()
+{
+    printf '%s\n' "${fil_cur}" > "${fif_tdf}"
+    fil_tdf="${fil_cur}"
+}
+
+_tdf()
+{
+    [ "${fil_cur}" = "${fil_tdf}" ] && \
+        [ -n "${pid_tdf}" ] && [ -e "/proc/${pid_tdf}" ] && return
+    [ -n "${pid_tdf}" ] && [ -e "/proc/${pid_tdf}" ] \
+        && { _tdf_add; return; }
+    _tdf_ini
+}
+
+
 # tabbed
 
 _prg_tbd_ini ()
@@ -260,6 +332,11 @@ _prg_tbd_ini ()
     _nvi_ini
     c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"
     [ "${pdf_prv}" = "image" ] || _zat_ini
+
+    # Neovim is started last, so restore the initial media preview afterwards.
+    case "${mim_cur}" in
+        video/*|image/*|audio/*) _tab_swi ;;
+    esac
 }
 
 
@@ -280,6 +357,10 @@ _ini()
     declare -g fil_bok
     declare -g xid_bok
     declare -g fif_bok
+    declare -g pid_tdf
+    declare -g fil_tdf
+    declare -g xid_tdf
+    declare -g fif_tdf
     
     declare -g tim_swi="y"
       
@@ -295,6 +376,7 @@ _ini()
         [ -d "${cfg_dir}" ] || mkdir "${cfg_dir}"
       
     source "${cfg_dir}/config" 2>/dev/null
+    [ "${uview_zen_cli}" = "y" ] && bok_zen="y"
     
     : ${tim_lim:="0.05"}
     : ${tim_lim_y:="200"}
@@ -322,6 +404,7 @@ _ini()
     : ${prg_trm:="st -c preview -w"}
     : ${mpv:="${MPVX:="mpv"}"}
     : ${bookokrat:="bookokrat"}
+    : ${tdf:="tdf"}
      
     if which ${prg_trm} >/dev/null 2>&1 ; then :
     elif which st       >/dev/null 2>&1 ; then prg_trm="st -c preview -w"
@@ -334,6 +417,11 @@ _ini()
         media() { _trm_nuk; } fi
     if [ "${doc_prv}" = "bookokrat" ] && which ${bookokrat} >/dev/null 2>&1 ; then
         doc()   { _bok; }
+    elif [ "${doc_prv}" = "tdf" ] && which ${tdf} >/dev/null 2>&1 ; then
+        doc()   { case "${mim_cur}" in
+            application/pdf) _tdf ;;
+            *) which ${bookokrat} >/dev/null 2>&1 && _bok || _trm_nuk ;;
+        esac; }
     elif [ "${pdf_prv}" = "image" ] && which pdftocairo >/dev/null 2>&1 ; then
         doc()   { _pdf; }
     elif which zathura >/dev/null 2>&1 ; then
@@ -359,7 +447,8 @@ _tab_swi()
         case ${mim_cur} in
             video/*|image/*|audio/*) [ -n "${xid_mpv}" ] || {
                 c="1"; xid_mpv="$(_tab_win_get "${pid_mpv}")"; }
-                _tab_chg_key "${tab_mpv}" ;;
+                _tab_chg "${xid_mpv}" \
+                || _tab_chg_key "${tab_mpv}" ;;
             text/*|text/x-diff|application/mbox|inode/*) [ -n "${xid_nvi}" ] || {
                 c="1"; xid_nvi="$(_tab_win_get "${pid_trm}")"; }
                 _tab_chg "${xid_nvi}" \
@@ -368,6 +457,10 @@ _tab_swi()
                 bookokrat) [ -n "${xid_bok}" ] || {
                     c="1"; xid_bok="$(_tab_win_get "${pid_bok}")"; }
                     _tab_chg "${xid_bok}" \
+                    || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
+                tdf) [ -n "${xid_tdf}" ] || {
+                    c="1"; xid_tdf="$(_tab_win_get "${pid_tdf}")"; }
+                    _tab_chg "${xid_tdf}" \
                     || xdotool key --window "${xid_tbd}" "Ctrl+${tab_zat}" ;;
                 *)     case ${pdf_prv} in
                 image) [ -n "${xid_mpv}" ] || {
@@ -409,6 +502,7 @@ _kil()
 { 
     kill "${pid_tbd}"
     _bok_kil
+    _tdf_kil
     rm -f "${soc_mpv}" "${soc_nvi}"
     exec 3>&-
     disown
@@ -439,9 +533,10 @@ _main()
     _kil
 }
 
-[ "${1}" = "--bookokrat-run" ] && {
-    _bok_run "${2}" "${3}" "${4}" "${5}"
-    exit
-}
+case "${1}" in
+    --bookokrat-run|--document-run)
+        _bok_run "${2}" "${3}" "${4}" "${5}"
+        exit ;;
+esac
 
 _main &
