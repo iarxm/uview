@@ -1,6 +1,0 @@
-#!/bin/env bash
-# set up testing environment
-#px=$HOME/dsrc/uview
-#pu=$px/uview
-px="$(pwd)"
-export PATH="$px:$PATH"
